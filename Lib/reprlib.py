@@ -1,161 +1,74 @@
-"""Redo the builtin repr() (representation) but with limits on most sizes."""
-
-__all__ = ["Repr", "repr", "recursive_repr"]
-
+'Redo the builtin repr() (representation) but with limits on most sizes.'
+_A='...'
+__all__=['Repr','repr','recursive_repr']
 import builtins
 from itertools import islice
 from _thread import get_ident
-
-def recursive_repr(fillvalue='...'):
-    'Decorator to make a repr function return fillvalue for a recursive call'
-
-    def decorating_function(user_function):
-        repr_running = set()
-
-        def wrapper(self):
-            key = id(self), get_ident()
-            if key in repr_running:
-                return fillvalue
-            repr_running.add(key)
-            try:
-                result = user_function(self)
-            finally:
-                repr_running.discard(key)
-            return result
-
-        # Can't use functools.wraps() here because of bootstrap issues
-        wrapper.__module__ = getattr(user_function, '__module__')
-        wrapper.__doc__ = getattr(user_function, '__doc__')
-        wrapper.__name__ = getattr(user_function, '__name__')
-        wrapper.__qualname__ = getattr(user_function, '__qualname__')
-        wrapper.__annotations__ = getattr(user_function, '__annotations__', {})
-        return wrapper
-
-    return decorating_function
-
+def recursive_repr(fillvalue=_A):
+	'Decorator to make a repr function return fillvalue for a recursive call'
+	def A(user_function):
+		A=user_function;C=set()
+		def B(self):
+			B=id(self),get_ident()
+			if B in C:return fillvalue
+			C.add(B)
+			try:D=A(self)
+			finally:C.discard(B)
+			return D
+		B.__module__=getattr(A,'__module__');B.__doc__=getattr(A,'__doc__');B.__name__=getattr(A,'__name__');B.__qualname__=getattr(A,'__qualname__');B.__annotations__=getattr(A,'__annotations__',{});return B
+	return A
 class Repr:
-
-    def __init__(self):
-        self.maxlevel = 6
-        self.maxtuple = 6
-        self.maxlist = 6
-        self.maxarray = 5
-        self.maxdict = 4
-        self.maxset = 6
-        self.maxfrozenset = 6
-        self.maxdeque = 6
-        self.maxstring = 30
-        self.maxlong = 40
-        self.maxother = 30
-
-    def repr(self, x):
-        return self.repr1(x, self.maxlevel)
-
-    def repr1(self, x, level):
-        typename = type(x).__name__
-        if ' ' in typename:
-            parts = typename.split()
-            typename = '_'.join(parts)
-        if hasattr(self, 'repr_' + typename):
-            return getattr(self, 'repr_' + typename)(x, level)
-        else:
-            return self.repr_instance(x, level)
-
-    def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
-        n = len(x)
-        if level <= 0 and n:
-            s = '...'
-        else:
-            newlevel = level - 1
-            repr1 = self.repr1
-            pieces = [repr1(elem, newlevel) for elem in islice(x, maxiter)]
-            if n > maxiter:  pieces.append('...')
-            s = ', '.join(pieces)
-            if n == 1 and trail:  right = trail + right
-        return '%s%s%s' % (left, s, right)
-
-    def repr_tuple(self, x, level):
-        return self._repr_iterable(x, level, '(', ')', self.maxtuple, ',')
-
-    def repr_list(self, x, level):
-        return self._repr_iterable(x, level, '[', ']', self.maxlist)
-
-    def repr_array(self, x, level):
-        if not x:
-            return "array('%s')" % x.typecode
-        header = "array('%s', [" % x.typecode
-        return self._repr_iterable(x, level, header, '])', self.maxarray)
-
-    def repr_set(self, x, level):
-        if not x:
-            return 'set()'
-        x = _possibly_sorted(x)
-        return self._repr_iterable(x, level, '{', '}', self.maxset)
-
-    def repr_frozenset(self, x, level):
-        if not x:
-            return 'frozenset()'
-        x = _possibly_sorted(x)
-        return self._repr_iterable(x, level, 'frozenset({', '})',
-                                   self.maxfrozenset)
-
-    def repr_deque(self, x, level):
-        return self._repr_iterable(x, level, 'deque([', '])', self.maxdeque)
-
-    def repr_dict(self, x, level):
-        n = len(x)
-        if n == 0: return '{}'
-        if level <= 0: return '{...}'
-        newlevel = level - 1
-        repr1 = self.repr1
-        pieces = []
-        for key in islice(_possibly_sorted(x), self.maxdict):
-            keyrepr = repr1(key, newlevel)
-            valrepr = repr1(x[key], newlevel)
-            pieces.append('%s: %s' % (keyrepr, valrepr))
-        if n > self.maxdict: pieces.append('...')
-        s = ', '.join(pieces)
-        return '{%s}' % (s,)
-
-    def repr_str(self, x, level):
-        s = builtins.repr(x[:self.maxstring])
-        if len(s) > self.maxstring:
-            i = max(0, (self.maxstring-3)//2)
-            j = max(0, self.maxstring-3-i)
-            s = builtins.repr(x[:i] + x[len(x)-j:])
-            s = s[:i] + '...' + s[len(s)-j:]
-        return s
-
-    def repr_int(self, x, level):
-        s = builtins.repr(x) # XXX Hope this isn't too slow...
-        if len(s) > self.maxlong:
-            i = max(0, (self.maxlong-3)//2)
-            j = max(0, self.maxlong-3-i)
-            s = s[:i] + '...' + s[len(s)-j:]
-        return s
-
-    def repr_instance(self, x, level):
-        try:
-            s = builtins.repr(x)
-            # Bugs in x.__repr__() can cause arbitrary
-            # exceptions -- then make up something
-        except Exception:
-            return '<%s instance at %#x>' % (x.__class__.__name__, id(x))
-        if len(s) > self.maxother:
-            i = max(0, (self.maxother-3)//2)
-            j = max(0, self.maxother-3-i)
-            s = s[:i] + '...' + s[len(s)-j:]
-        return s
-
-
+	def __init__(A):A.maxlevel=6;A.maxtuple=6;A.maxlist=6;A.maxarray=5;A.maxdict=4;A.maxset=6;A.maxfrozenset=6;A.maxdeque=6;A.maxstring=30;A.maxlong=40;A.maxother=30
+	def repr(A,x):return A.repr1(x,A.maxlevel)
+	def repr1(B,x,level):
+		C='repr_';D=level;A=type(x).__name__
+		if' 'in A:E=A.split();A='_'.join(E)
+		if hasattr(B,C+A):return getattr(B,C+A)(x,D)
+		else:return B.repr_instance(x,D)
+	def _repr_iterable(H,x,level,left,right,maxiter,trail=''):
+		C=trail;D=maxiter;E=level;A=right;B=len(x)
+		if E<=0 and B:F=_A
+		else:
+			I=E-1;J=H.repr1;G=[J(A,I)for A in islice(x,D)]
+			if B>D:G.append(_A)
+			F=', '.join(G)
+			if B==1 and C:A=C+A
+		return'%s%s%s'%(left,F,A)
+	def repr_tuple(A,x,level):return A._repr_iterable(x,level,'(',')',A.maxtuple,',')
+	def repr_list(A,x,level):return A._repr_iterable(x,level,'[',']',A.maxlist)
+	def repr_array(A,x,level):
+		if not x:return"array('%s')"%x.typecode
+		B="array('%s', ["%x.typecode;return A._repr_iterable(x,level,B,'])',A.maxarray)
+	def repr_set(A,x,level):
+		if not x:return'set()'
+		x=_possibly_sorted(x);return A._repr_iterable(x,level,'{','}',A.maxset)
+	def repr_frozenset(A,x,level):
+		if not x:return'frozenset()'
+		x=_possibly_sorted(x);return A._repr_iterable(x,level,'frozenset({','})',A.maxfrozenset)
+	def repr_deque(A,x,level):return A._repr_iterable(x,level,'deque([','])',A.maxdeque)
+	def repr_dict(A,x,level):
+		C=level;D=len(x)
+		if D==0:return'{}'
+		if C<=0:return'{...}'
+		E=C-1;F=A.repr1;B=[]
+		for G in islice(_possibly_sorted(x),A.maxdict):H=F(G,E);I=F(x[G],E);B.append('%s: %s'%(H,I))
+		if D>A.maxdict:B.append(_A)
+		J=', '.join(B);return'{%s}'%(J,)
+	def repr_str(B,x,level):
+		A=builtins.repr(x[:B.maxstring])
+		if len(A)>B.maxstring:C=max(0,(B.maxstring-3)//2);D=max(0,B.maxstring-3-C);A=builtins.repr(x[:C]+x[len(x)-D:]);A=A[:C]+_A+A[len(A)-D:]
+		return A
+	def repr_int(B,x,level):
+		A=builtins.repr(x)
+		if len(A)>B.maxlong:C=max(0,(B.maxlong-3)//2);D=max(0,B.maxlong-3-C);A=A[:C]+_A+A[len(A)-D:]
+		return A
+	def repr_instance(B,x,level):
+		try:A=builtins.repr(x)
+		except Exception:return'<%s instance at %#x>'%(x.__class__.__name__,id(x))
+		if len(A)>B.maxother:C=max(0,(B.maxother-3)//2);D=max(0,B.maxother-3-C);A=A[:C]+_A+A[len(A)-D:]
+		return A
 def _possibly_sorted(x):
-    # Since not all sequences of items can be sorted and comparison
-    # functions may raise arbitrary exceptions, return an unsorted
-    # sequence in that case.
-    try:
-        return sorted(x)
-    except Exception:
-        return list(x)
-
-aRepr = Repr()
-repr = aRepr.repr
+	try:return sorted(x)
+	except Exception:return list(x)
+aRepr=Repr()
+repr=aRepr.repr

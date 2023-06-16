@@ -1,47 +1,16 @@
-from typing import Any, Dict, Iterator, List, Protocol, TypeVar, Union
-
-
-_T = TypeVar("_T")
-
-
+from typing import Any,Dict,Iterator,List,Protocol,TypeVar,Union
+_T=TypeVar('_T')
 class PackageMetadata(Protocol):
-    def __len__(self) -> int:
-        ...  # pragma: no cover
-
-    def __contains__(self, item: str) -> bool:
-        ...  # pragma: no cover
-
-    def __getitem__(self, key: str) -> str:
-        ...  # pragma: no cover
-
-    def __iter__(self) -> Iterator[str]:
-        ...  # pragma: no cover
-
-    def get_all(self, name: str, failobj: _T = ...) -> Union[List[Any], _T]:
-        """
-        Return all values associated with a possibly multi-valued key.
-        """
-
-    @property
-    def json(self) -> Dict[str, Union[str, List[str]]]:
-        """
-        A JSON-compatible form of the metadata.
-        """
-
-
+	def __len__(A):...
+	def __contains__(A,item):...
+	def __getitem__(A,key):...
+	def __iter__(A):...
+	def get_all(A,name,failobj=...):'\n        Return all values associated with a possibly multi-valued key.\n        '
+	@property
+	def json(self):'\n        A JSON-compatible form of the metadata.\n        '
 class SimplePath(Protocol):
-    """
-    A minimal subset of pathlib.Path required by PathDistribution.
-    """
-
-    def joinpath(self) -> 'SimplePath':
-        ...  # pragma: no cover
-
-    def __truediv__(self) -> 'SimplePath':
-        ...  # pragma: no cover
-
-    def parent(self) -> 'SimplePath':
-        ...  # pragma: no cover
-
-    def read_text(self) -> str:
-        ...  # pragma: no cover
+	'\n    A minimal subset of pathlib.Path required by PathDistribution.\n    '
+	def joinpath(A):...
+	def __truediv__(A):...
+	def parent(A):...
+	def read_text(A):...

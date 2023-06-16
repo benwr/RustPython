@@ -1,73 +1,34 @@
-"""JSON token scanner
-"""
+'JSON token scanner\n'
+_A=None
 import re
-try:
-    from _json import make_scanner as c_make_scanner
-except ImportError:
-    c_make_scanner = None
-
-__all__ = ['make_scanner']
-
-NUMBER_RE = re.compile(
-    r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?',
-    (re.VERBOSE | re.MULTILINE | re.DOTALL))
-
+try:from _json import make_scanner as c_make_scanner
+except ImportError:c_make_scanner=_A
+__all__=['make_scanner']
+NUMBER_RE=re.compile('(-?(?:0|[1-9]\\d*))(\\.\\d+)?([eE][-+]?\\d+)?',re.VERBOSE|re.MULTILINE|re.DOTALL)
 def py_make_scanner(context):
-    parse_object = context.parse_object
-    parse_array = context.parse_array
-    parse_string = context.parse_string
-    match_number = NUMBER_RE.match
-    strict = context.strict
-    parse_float = context.parse_float
-    parse_int = context.parse_int
-    parse_constant = context.parse_constant
-    object_hook = context.object_hook
-    object_pairs_hook = context.object_pairs_hook
-    memo = context.memo
-
-    def _scan_once(string, idx):
-        try:
-            nextchar = string[idx]
-        except IndexError:
-            raise StopIteration(idx) from None
-
-        if nextchar == '"':
-            return parse_string(string, idx + 1, strict)
-        elif nextchar == '{':
-            return parse_object((string, idx + 1), strict,
-                _scan_once, object_hook, object_pairs_hook, memo)
-        elif nextchar == '[':
-            return parse_array((string, idx + 1), _scan_once)
-        elif nextchar == 'n' and string[idx:idx + 4] == 'null':
-            return None, idx + 4
-        elif nextchar == 't' and string[idx:idx + 4] == 'true':
-            return True, idx + 4
-        elif nextchar == 'f' and string[idx:idx + 5] == 'false':
-            return False, idx + 5
-
-        m = match_number(string, idx)
-        if m is not None:
-            integer, frac, exp = m.groups()
-            if frac or exp:
-                res = parse_float(integer + (frac or '') + (exp or ''))
-            else:
-                res = parse_int(integer)
-            return res, m.end()
-        elif nextchar == 'N' and string[idx:idx + 3] == 'NaN':
-            return parse_constant('NaN'), idx + 3
-        elif nextchar == 'I' and string[idx:idx + 8] == 'Infinity':
-            return parse_constant('Infinity'), idx + 8
-        elif nextchar == '-' and string[idx:idx + 9] == '-Infinity':
-            return parse_constant('-Infinity'), idx + 9
-        else:
-            raise StopIteration(idx)
-
-    def scan_once(string, idx):
-        try:
-            return _scan_once(string, idx)
-        finally:
-            memo.clear()
-
-    return scan_once
-
-make_scanner = c_make_scanner or py_make_scanner
+	A=context;P=A.parse_object;Q=A.parse_array;R=A.parse_string;S=NUMBER_RE.match;G=A.strict;T=A.parse_float;U=A.parse_int;D=A.parse_constant;V=A.object_hook;W=A.object_pairs_hook;H=A.memo
+	def E(string,idx):
+		I='-Infinity';J='Infinity';K='NaN';B=string;A=idx
+		try:C=B[A]
+		except IndexError:raise StopIteration(A)from _A
+		if C=='"':return R(B,A+1,G)
+		elif C=='{':return P((B,A+1),G,E,V,W,H)
+		elif C=='[':return Q((B,A+1),E)
+		elif C=='n'and B[A:A+4]=='null':return _A,A+4
+		elif C=='t'and B[A:A+4]=='true':return True,A+4
+		elif C=='f'and B[A:A+5]=='false':return False,A+5
+		F=S(B,A)
+		if F is not _A:
+			L,M,N=F.groups()
+			if M or N:O=T(L+(M or'')+(N or''))
+			else:O=U(L)
+			return O,F.end()
+		elif C=='N'and B[A:A+3]==K:return D(K),A+3
+		elif C=='I'and B[A:A+8]==J:return D(J),A+8
+		elif C=='-'and B[A:A+9]==I:return D(I),A+9
+		else:raise StopIteration(A)
+	def B(string,idx):
+		try:return E(string,idx)
+		finally:H.clear()
+	return B
+make_scanner=c_make_scanner or py_make_scanner

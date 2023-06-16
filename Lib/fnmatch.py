@@ -1,199 +1,70 @@
-"""Filename matching with shell patterns.
-
-fnmatch(FILENAME, PATTERN) matches according to the local convention.
-fnmatchcase(FILENAME, PATTERN) always takes case in account.
-
-The functions operate by translating the pattern into a regular
-expression.  They cache the compiled regular expressions for speed.
-
-The function translate(PATTERN) returns a regular expression
-corresponding to PATTERN.  (It does not compile it.)
-"""
-import os
-import posixpath
-import re
-import functools
-
-__all__ = ["filter", "fnmatch", "fnmatchcase", "translate"]
-
-# Build a thread-safe incrementing counter to help create unique regexp group
-# names across calls.
+'Filename matching with shell patterns.\n\nfnmatch(FILENAME, PATTERN) matches according to the local convention.\nfnmatchcase(FILENAME, PATTERN) always takes case in account.\n\nThe functions operate by translating the pattern into a regular\nexpression.  They cache the compiled regular expressions for speed.\n\nThe function translate(PATTERN) returns a regular expression\ncorresponding to PATTERN.  (It does not compile it.)\n'
+import os,posixpath,re,functools
+__all__=['filter','fnmatch','fnmatchcase','translate']
 from itertools import count
-_nextgroupnum = count().__next__
+_nextgroupnum=count().__next__
 del count
-
-def fnmatch(name, pat):
-    """Test whether FILENAME matches PATTERN.
-
-    Patterns are Unix shell style:
-
-    *       matches everything
-    ?       matches any single character
-    [seq]   matches any character in seq
-    [!seq]  matches any char not in seq
-
-    An initial period in FILENAME is not special.
-    Both FILENAME and PATTERN are first case-normalized
-    if the operating system requires it.
-    If you don't want this, use fnmatchcase(FILENAME, PATTERN).
-    """
-    name = os.path.normcase(name)
-    pat = os.path.normcase(pat)
-    return fnmatchcase(name, pat)
-
-@functools.lru_cache(maxsize=256, typed=True)
+def fnmatch(name,pat):"Test whether FILENAME matches PATTERN.\n\n    Patterns are Unix shell style:\n\n    *       matches everything\n    ?       matches any single character\n    [seq]   matches any character in seq\n    [!seq]  matches any char not in seq\n\n    An initial period in FILENAME is not special.\n    Both FILENAME and PATTERN are first case-normalized\n    if the operating system requires it.\n    If you don't want this, use fnmatchcase(FILENAME, PATTERN).\n    ";A=pat;B=name;B=os.path.normcase(B);A=os.path.normcase(A);return fnmatchcase(B,A)
+@functools.lru_cache(maxsize=256,typed=True)
 def _compile_pattern(pat):
-    if isinstance(pat, bytes):
-        pat_str = str(pat, 'ISO-8859-1')
-        res_str = translate(pat_str)
-        res = bytes(res_str, 'ISO-8859-1')
-    else:
-        res = translate(pat)
-    return re.compile(res).match
-
-def filter(names, pat):
-    """Construct a list from those elements of the iterable NAMES that match PAT."""
-    result = []
-    pat = os.path.normcase(pat)
-    match = _compile_pattern(pat)
-    if os.path is posixpath:
-        # normcase on posix is NOP. Optimize it away from the loop.
-        for name in names:
-            if match(name):
-                result.append(name)
-    else:
-        for name in names:
-            if match(os.path.normcase(name)):
-                result.append(name)
-    return result
-
-def fnmatchcase(name, pat):
-    """Test whether FILENAME matches PATTERN, including case.
-
-    This is a version of fnmatch() which doesn't case-normalize
-    its arguments.
-    """
-    match = _compile_pattern(pat)
-    return match(name) is not None
-
-
+	B='ISO-8859-1';A=pat
+	if isinstance(A,bytes):D=str(A,B);E=translate(D);C=bytes(E,B)
+	else:C=translate(A)
+	return re.compile(C).match
+def filter(names,pat):
+	'Construct a list from those elements of the iterable NAMES that match PAT.';D=names;B=pat;C=[];B=os.path.normcase(B);E=_compile_pattern(B)
+	if os.path is posixpath:
+		for A in D:
+			if E(A):C.append(A)
+	else:
+		for A in D:
+			if E(os.path.normcase(A)):C.append(A)
+	return C
+def fnmatchcase(name,pat):"Test whether FILENAME matches PATTERN, including case.\n\n    This is a version of fnmatch() which doesn't case-normalize\n    its arguments.\n    ";A=_compile_pattern(pat);return A(name)is not None
 def translate(pat):
-    """Translate a shell PATTERN to a regular expression.
-
-    There is no way to quote meta-characters.
-    """
-
-    STAR = object()
-    res = []
-    add = res.append
-    i, n = 0, len(pat)
-    while i < n:
-        c = pat[i]
-        i = i+1
-        if c == '*':
-            # compress consecutive `*` into one
-            if (not res) or res[-1] is not STAR:
-                add(STAR)
-        elif c == '?':
-            add('.')
-        elif c == '[':
-            j = i
-            if j < n and pat[j] == '!':
-                j = j+1
-            if j < n and pat[j] == ']':
-                j = j+1
-            while j < n and pat[j] != ']':
-                j = j+1
-            if j >= n:
-                add('\\[')
-            else:
-                stuff = pat[i:j]
-                if '-' not in stuff:
-                    stuff = stuff.replace('\\', r'\\')
-                else:
-                    chunks = []
-                    k = i+2 if pat[i] == '!' else i+1
-                    while True:
-                        k = pat.find('-', k, j)
-                        if k < 0:
-                            break
-                        chunks.append(pat[i:k])
-                        i = k+1
-                        k = k+3
-                    chunk = pat[i:j]
-                    if chunk:
-                        chunks.append(chunk)
-                    else:
-                        chunks[-1] += '-'
-                    # Remove empty ranges -- invalid in RE.
-                    for k in range(len(chunks)-1, 0, -1):
-                        if chunks[k-1][-1] > chunks[k][0]:
-                            chunks[k-1] = chunks[k-1][:-1] + chunks[k][1:]
-                            del chunks[k]
-                    # Escape backslashes and hyphens for set difference (--).
-                    # Hyphens that create ranges shouldn't be escaped.
-                    stuff = '-'.join(s.replace('\\', r'\\').replace('-', r'\-')
-                                     for s in chunks)
-                # Escape set operations (&&, ~~ and ||).
-                stuff = re.sub(r'([&~|])', r'\\\1', stuff)
-                i = j+1
-                if not stuff:
-                    # Empty range: never match.
-                    add('(?!)')
-                elif stuff == '!':
-                    # Negated empty range: match any character.
-                    add('.')
-                else:
-                    if stuff[0] == '!':
-                        stuff = '^' + stuff[1:]
-                    elif stuff[0] in ('^', '['):
-                        stuff = '\\' + stuff
-                    add(f'[{stuff}]')
-        else:
-            add(re.escape(c))
-    assert i == n
-
-    # Deal with STARs.
-    inp = res
-    res = []
-    add = res.append
-    i, n = 0, len(inp)
-    # Fixed pieces at the start?
-    while i < n and inp[i] is not STAR:
-        add(inp[i])
-        i += 1
-    # Now deal with STAR fixed STAR fixed ...
-    # For an interior `STAR fixed` pairing, we want to do a minimal
-    # .*? match followed by `fixed`, with no possibility of backtracking.
-    # We can't spell that directly, but can trick it into working by matching
-    #    .*?fixed
-    # in a lookahead assertion, save the matched part in a group, then
-    # consume that group via a backreference. If the overall match fails,
-    # the lookahead assertion won't try alternatives. So the translation is:
-    #     (?=(?P<name>.*?fixed))(?P=name)
-    # Group names are created as needed: g0, g1, g2, ...
-    # The numbers are obtained from _nextgroupnum() to ensure they're unique
-    # across calls and across threads. This is because people rely on the
-    # undocumented ability to join multiple translate() results together via
-    # "|" to build large regexps matching "one of many" shell patterns.
-    while i < n:
-        assert inp[i] is STAR
-        i += 1
-        if i == n:
-            add(".*")
-            break
-        assert inp[i] is not STAR
-        fixed = []
-        while i < n and inp[i] is not STAR:
-            fixed.append(inp[i])
-            i += 1
-        fixed = "".join(fixed)
-        if i == n:
-            add(".*")
-            add(fixed)
-        else:
-            groupnum = _nextgroupnum()
-            add(f"(?=(?P<g{groupnum}>.*?{fixed}))(?P=g{groupnum})")
-    assert i == n
-    res = "".join(res)
-    return fr'(?s:{res})\Z'
+	'Translate a shell PATTERN to a regular expression.\n\n    There is no way to quote meta-characters.\n    ';Q='\\\\';P='\\';N='!';L='-';H=pat;K=object();I=[];E=I.append;A,F=0,len(H)
+	while A<F:
+		O=H[A];A=A+1
+		if O=='*':
+			if not I or I[-1]is not K:E(K)
+		elif O=='?':E('.')
+		elif O=='[':
+			B=A
+			if B<F and H[B]==N:B=B+1
+			if B<F and H[B]==']':B=B+1
+			while B<F and H[B]!=']':B=B+1
+			if B>=F:E('\\[')
+			else:
+				C=H[A:B]
+				if L not in C:C=C.replace(P,Q)
+				else:
+					G=[];D=A+2 if H[A]==N else A+1
+					while True:
+						D=H.find(L,D,B)
+						if D<0:break
+						G.append(H[A:D]);A=D+1;D=D+3
+					R=H[A:B]
+					if R:G.append(R)
+					else:G[-1]+=L
+					for D in range(len(G)-1,0,-1):
+						if G[D-1][-1]>G[D][0]:G[D-1]=G[D-1][:-1]+G[D][1:];del G[D]
+					C=L.join(A.replace(P,Q).replace(L,'\\-')for A in G)
+				C=re.sub('([&~|])','\\\\\\1',C);A=B+1
+				if not C:E('(?!)')
+				elif C==N:E('.')
+				else:
+					if C[0]==N:C='^'+C[1:]
+					elif C[0]in('^','['):C=P+C
+					E(f"[{C}]")
+		else:E(re.escape(O))
+	assert A==F;J=I;I=[];E=I.append;A,F=0,len(J)
+	while A<F and J[A]is not K:E(J[A]);A+=1
+	while A<F:
+		assert J[A]is K;A+=1
+		if A==F:E('.*');break
+		assert J[A]is not K;M=[]
+		while A<F and J[A]is not K:M.append(J[A]);A+=1
+		M=''.join(M)
+		if A==F:E('.*');E(M)
+		else:S=_nextgroupnum();E(f"(?=(?P<g{S}>.*?{M}))(?P=g{S})")
+	assert A==F;I=''.join(I);return f"(?s:{I})\\Z"

@@ -1,442 +1,156 @@
-"""Implementation of JSONEncoder
-"""
+'Implementation of JSONEncoder\n'
+_E='\\u{0:04x}'
+_D='\n'
+_C=False
+_B=True
+_A=None
 import re
-
-try:
-    from _json import encode_basestring_ascii as c_encode_basestring_ascii
-except ImportError:
-    c_encode_basestring_ascii = None
-try:
-    from _json import encode_basestring as c_encode_basestring
-except ImportError:
-    c_encode_basestring = None
-try:
-    from _json import make_encoder as c_make_encoder
-except ImportError:
-    c_make_encoder = None
-
-ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
-ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
-HAS_UTF8 = re.compile(b'[\x80-\xff]')
-ESCAPE_DCT = {
-    '\\': '\\\\',
-    '"': '\\"',
-    '\b': '\\b',
-    '\f': '\\f',
-    '\n': '\\n',
-    '\r': '\\r',
-    '\t': '\\t',
-}
-for i in range(0x20):
-    ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))
-    #ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
-
-INFINITY = float('inf')
-
+try:from _json import encode_basestring_ascii as c_encode_basestring_ascii
+except ImportError:c_encode_basestring_ascii=_A
+try:from _json import encode_basestring as c_encode_basestring
+except ImportError:c_encode_basestring=_A
+try:from _json import make_encoder as c_make_encoder
+except ImportError:c_make_encoder=_A
+ESCAPE=re.compile('[\\x00-\\x1f\\\\"\\b\\f\\n\\r\\t]')
+ESCAPE_ASCII=re.compile('([\\\\"]|[^\\ -~])')
+HAS_UTF8=re.compile(b'[\x80-\xff]')
+ESCAPE_DCT={'\\':'\\\\','"':'\\"','\x08':'\\b','\x0c':'\\f',_D:'\\n','\r':'\\r','\t':'\\t'}
+for i in range(32):ESCAPE_DCT.setdefault(chr(i),_E.format(i))
+INFINITY=float('inf')
 def py_encode_basestring(s):
-    """Return a JSON representation of a Python string
-
-    """
-    def replace(match):
-        return ESCAPE_DCT[match.group(0)]
-    return '"' + ESCAPE.sub(replace, s) + '"'
-
-
-encode_basestring = (c_encode_basestring or py_encode_basestring)
-
-
+	'Return a JSON representation of a Python string\n\n    '
+	def A(match):return ESCAPE_DCT[match.group(0)]
+	return'"'+ESCAPE.sub(A,s)+'"'
+encode_basestring=c_encode_basestring or py_encode_basestring
 def py_encode_basestring_ascii(s):
-    """Return an ASCII-only JSON representation of a Python string
-
-    """
-    def replace(match):
-        s = match.group(0)
-        try:
-            return ESCAPE_DCT[s]
-        except KeyError:
-            n = ord(s)
-            if n < 0x10000:
-                return '\\u{0:04x}'.format(n)
-                #return '\\u%04x' % (n,)
-            else:
-                # surrogate pair
-                n -= 0x10000
-                s1 = 0xd800 | ((n >> 10) & 0x3ff)
-                s2 = 0xdc00 | (n & 0x3ff)
-                return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
-    return '"' + ESCAPE_ASCII.sub(replace, s) + '"'
-
-
-encode_basestring_ascii = (
-    c_encode_basestring_ascii or py_encode_basestring_ascii)
-
-class JSONEncoder(object):
-    """Extensible JSON <http://json.org> encoder for Python data structures.
-
-    Supports the following objects and types by default:
-
-    +-------------------+---------------+
-    | Python            | JSON          |
-    +===================+===============+
-    | dict              | object        |
-    +-------------------+---------------+
-    | list, tuple       | array         |
-    +-------------------+---------------+
-    | str               | string        |
-    +-------------------+---------------+
-    | int, float        | number        |
-    +-------------------+---------------+
-    | True              | true          |
-    +-------------------+---------------+
-    | False             | false         |
-    +-------------------+---------------+
-    | None              | null          |
-    +-------------------+---------------+
-
-    To extend this to recognize other objects, subclass and implement a
-    ``.default()`` method with another method that returns a serializable
-    object for ``o`` if possible, otherwise it should call the superclass
-    implementation (to raise ``TypeError``).
-
-    """
-    item_separator = ', '
-    key_separator = ': '
-    def __init__(self, *, skipkeys=False, ensure_ascii=True,
-            check_circular=True, allow_nan=True, sort_keys=False,
-            indent=None, separators=None, default=None):
-        """Constructor for JSONEncoder, with sensible defaults.
-
-        If skipkeys is false, then it is a TypeError to attempt
-        encoding of keys that are not str, int, float or None.  If
-        skipkeys is True, such items are simply skipped.
-
-        If ensure_ascii is true, the output is guaranteed to be str
-        objects with all incoming non-ASCII characters escaped.  If
-        ensure_ascii is false, the output can contain non-ASCII characters.
-
-        If check_circular is true, then lists, dicts, and custom encoded
-        objects will be checked for circular references during encoding to
-        prevent an infinite recursion (which would cause an RecursionError).
-        Otherwise, no such check takes place.
-
-        If allow_nan is true, then NaN, Infinity, and -Infinity will be
-        encoded as such.  This behavior is not JSON specification compliant,
-        but is consistent with most JavaScript based encoders and decoders.
-        Otherwise, it will be a ValueError to encode such floats.
-
-        If sort_keys is true, then the output of dictionaries will be
-        sorted by key; this is useful for regression tests to ensure
-        that JSON serializations can be compared on a day-to-day basis.
-
-        If indent is a non-negative integer, then JSON array
-        elements and object members will be pretty-printed with that
-        indent level.  An indent level of 0 will only insert newlines.
-        None is the most compact representation.
-
-        If specified, separators should be an (item_separator, key_separator)
-        tuple.  The default is (', ', ': ') if *indent* is ``None`` and
-        (',', ': ') otherwise.  To get the most compact JSON representation,
-        you should specify (',', ':') to eliminate whitespace.
-
-        If specified, default is a function that gets called for objects
-        that can't otherwise be serialized.  It should return a JSON encodable
-        version of the object or raise a ``TypeError``.
-
-        """
-
-        self.skipkeys = skipkeys
-        self.ensure_ascii = ensure_ascii
-        self.check_circular = check_circular
-        self.allow_nan = allow_nan
-        self.sort_keys = sort_keys
-        self.indent = indent
-        if separators is not None:
-            self.item_separator, self.key_separator = separators
-        elif indent is not None:
-            self.item_separator = ','
-        if default is not None:
-            self.default = default
-
-    def default(self, o):
-        """Implement this method in a subclass such that it returns
-        a serializable object for ``o``, or calls the base implementation
-        (to raise a ``TypeError``).
-
-        For example, to support arbitrary iterators, you could
-        implement default like this::
-
-            def default(self, o):
-                try:
-                    iterable = iter(o)
-                except TypeError:
-                    pass
-                else:
-                    return list(iterable)
-                # Let the base class default method raise the TypeError
-                return JSONEncoder.default(self, o)
-
-        """
-        raise TypeError(f'Object of type {o.__class__.__name__} '
-                        f'is not JSON serializable')
-
-    def encode(self, o):
-        """Return a JSON string representation of a Python data structure.
-
-        >>> from json.encoder import JSONEncoder
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
-        '{"foo": ["bar", "baz"]}'
-
-        """
-        # This is for extremely simple cases and benchmarks.
-        if isinstance(o, str):
-            if self.ensure_ascii:
-                return encode_basestring_ascii(o)
-            else:
-                return encode_basestring(o)
-        # This doesn't pass the iterator directly to ''.join() because the
-        # exceptions aren't as detailed.  The list call should be roughly
-        # equivalent to the PySequence_Fast that ''.join() would do.
-        chunks = self.iterencode(o, _one_shot=True)
-        if not isinstance(chunks, (list, tuple)):
-            chunks = list(chunks)
-        return ''.join(chunks)
-
-    def iterencode(self, o, _one_shot=False):
-        """Encode the given object and yield each string
-        representation as available.
-
-        For example::
-
-            for chunk in JSONEncoder().iterencode(bigobject):
-                mysocket.write(chunk)
-
-        """
-        if self.check_circular:
-            markers = {}
-        else:
-            markers = None
-        if self.ensure_ascii:
-            _encoder = encode_basestring_ascii
-        else:
-            _encoder = encode_basestring
-
-        def floatstr(o, allow_nan=self.allow_nan,
-                _repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
-            # Check for specials.  Note that this type of test is processor
-            # and/or platform-specific, so do tests which don't depend on the
-            # internals.
-
-            if o != o:
-                text = 'NaN'
-            elif o == _inf:
-                text = 'Infinity'
-            elif o == _neginf:
-                text = '-Infinity'
-            else:
-                return _repr(o)
-
-            if not allow_nan:
-                raise ValueError(
-                    "Out of range float values are not JSON compliant: " +
-                    repr(o))
-
-            return text
-
-
-        if (_one_shot and c_make_encoder is not None
-                and self.indent is None):
-            _iterencode = c_make_encoder(
-                markers, self.default, _encoder, self.indent,
-                self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, self.allow_nan)
-        else:
-            _iterencode = _make_iterencode(
-                markers, self.default, _encoder, self.indent, floatstr,
-                self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, _one_shot)
-        return _iterencode(o, 0)
-
-def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
-        _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
-        ## HACK: hand-optimized bytecode; turn globals into locals
-        ValueError=ValueError,
-        dict=dict,
-        float=float,
-        id=id,
-        int=int,
-        isinstance=isinstance,
-        list=list,
-        str=str,
-        tuple=tuple,
-        _intstr=int.__repr__,
-    ):
-
-    if _indent is not None and not isinstance(_indent, str):
-        _indent = ' ' * _indent
-
-    def _iterencode_list(lst, _current_indent_level):
-        if not lst:
-            yield '[]'
-            return
-        if markers is not None:
-            markerid = id(lst)
-            if markerid in markers:
-                raise ValueError("Circular reference detected")
-            markers[markerid] = lst
-        buf = '['
-        if _indent is not None:
-            _current_indent_level += 1
-            newline_indent = '\n' + _indent * _current_indent_level
-            separator = _item_separator + newline_indent
-            buf += newline_indent
-        else:
-            newline_indent = None
-            separator = _item_separator
-        first = True
-        for value in lst:
-            if first:
-                first = False
-            else:
-                buf = separator
-            if isinstance(value, str):
-                yield buf + _encoder(value)
-            elif value is None:
-                yield buf + 'null'
-            elif value is True:
-                yield buf + 'true'
-            elif value is False:
-                yield buf + 'false'
-            elif isinstance(value, int):
-                # Subclasses of int/float may override __repr__, but we still
-                # want to encode them as integers/floats in JSON. One example
-                # within the standard library is IntEnum.
-                yield buf + _intstr(value)
-            elif isinstance(value, float):
-                # see comment above for int
-                yield buf + _floatstr(value)
-            else:
-                yield buf
-                if isinstance(value, (list, tuple)):
-                    chunks = _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    chunks = _iterencode_dict(value, _current_indent_level)
-                else:
-                    chunks = _iterencode(value, _current_indent_level)
-                yield from chunks
-        if newline_indent is not None:
-            _current_indent_level -= 1
-            yield '\n' + _indent * _current_indent_level
-        yield ']'
-        if markers is not None:
-            del markers[markerid]
-
-    def _iterencode_dict(dct, _current_indent_level):
-        if not dct:
-            yield '{}'
-            return
-        if markers is not None:
-            markerid = id(dct)
-            if markerid in markers:
-                raise ValueError("Circular reference detected")
-            markers[markerid] = dct
-        yield '{'
-        if _indent is not None:
-            _current_indent_level += 1
-            newline_indent = '\n' + _indent * _current_indent_level
-            item_separator = _item_separator + newline_indent
-            yield newline_indent
-        else:
-            newline_indent = None
-            item_separator = _item_separator
-        first = True
-        if _sort_keys:
-            items = sorted(dct.items())
-        else:
-            items = dct.items()
-        for key, value in items:
-            if isinstance(key, str):
-                pass
-            # JavaScript is weakly typed for these, so it makes sense to
-            # also allow them.  Many encoders seem to do something like this.
-            elif isinstance(key, float):
-                # see comment for int/float in _make_iterencode
-                key = _floatstr(key)
-            elif key is True:
-                key = 'true'
-            elif key is False:
-                key = 'false'
-            elif key is None:
-                key = 'null'
-            elif isinstance(key, int):
-                # see comment for int/float in _make_iterencode
-                key = _intstr(key)
-            elif _skipkeys:
-                continue
-            else:
-                raise TypeError(f'keys must be str, int, float, bool or None, '
-                                f'not {key.__class__.__name__}')
-            if first:
-                first = False
-            else:
-                yield item_separator
-            yield _encoder(key)
-            yield _key_separator
-            if isinstance(value, str):
-                yield _encoder(value)
-            elif value is None:
-                yield 'null'
-            elif value is True:
-                yield 'true'
-            elif value is False:
-                yield 'false'
-            elif isinstance(value, int):
-                # see comment for int/float in _make_iterencode
-                yield _intstr(value)
-            elif isinstance(value, float):
-                # see comment for int/float in _make_iterencode
-                yield _floatstr(value)
-            else:
-                if isinstance(value, (list, tuple)):
-                    chunks = _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    chunks = _iterencode_dict(value, _current_indent_level)
-                else:
-                    chunks = _iterencode(value, _current_indent_level)
-                yield from chunks
-        if newline_indent is not None:
-            _current_indent_level -= 1
-            yield '\n' + _indent * _current_indent_level
-        yield '}'
-        if markers is not None:
-            del markers[markerid]
-
-    def _iterencode(o, _current_indent_level):
-        if isinstance(o, str):
-            yield _encoder(o)
-        elif o is None:
-            yield 'null'
-        elif o is True:
-            yield 'true'
-        elif o is False:
-            yield 'false'
-        elif isinstance(o, int):
-            # see comment for int/float in _make_iterencode
-            yield _intstr(o)
-        elif isinstance(o, float):
-            # see comment for int/float in _make_iterencode
-            yield _floatstr(o)
-        elif isinstance(o, (list, tuple)):
-            yield from _iterencode_list(o, _current_indent_level)
-        elif isinstance(o, dict):
-            yield from _iterencode_dict(o, _current_indent_level)
-        else:
-            if markers is not None:
-                markerid = id(o)
-                if markerid in markers:
-                    raise ValueError("Circular reference detected")
-                markers[markerid] = o
-            o = _default(o)
-            yield from _iterencode(o, _current_indent_level)
-            if markers is not None:
-                del markers[markerid]
-    return _iterencode
+	'Return an ASCII-only JSON representation of a Python string\n\n    '
+	def A(match):
+		B=match.group(0)
+		try:return ESCAPE_DCT[B]
+		except KeyError:
+			A=ord(B)
+			if A<65536:return _E.format(A)
+			else:A-=65536;C=55296|A>>10&1023;D=56320|A&1023;return'\\u{0:04x}\\u{1:04x}'.format(C,D)
+	return'"'+ESCAPE_ASCII.sub(A,s)+'"'
+encode_basestring_ascii=c_encode_basestring_ascii or py_encode_basestring_ascii
+class JSONEncoder:
+	'Extensible JSON <http://json.org> encoder for Python data structures.\n\n    Supports the following objects and types by default:\n\n    +-------------------+---------------+\n    | Python            | JSON          |\n    +===================+===============+\n    | dict              | object        |\n    +-------------------+---------------+\n    | list, tuple       | array         |\n    +-------------------+---------------+\n    | str               | string        |\n    +-------------------+---------------+\n    | int, float        | number        |\n    +-------------------+---------------+\n    | True              | true          |\n    +-------------------+---------------+\n    | False             | false         |\n    +-------------------+---------------+\n    | None              | null          |\n    +-------------------+---------------+\n\n    To extend this to recognize other objects, subclass and implement a\n    ``.default()`` method with another method that returns a serializable\n    object for ``o`` if possible, otherwise it should call the superclass\n    implementation (to raise ``TypeError``).\n\n    ';item_separator=', ';key_separator=': '
+	def __init__(A,*,skipkeys=_C,ensure_ascii=_B,check_circular=_B,allow_nan=_B,sort_keys=_C,indent=_A,separators=_A,default=_A):
+		"Constructor for JSONEncoder, with sensible defaults.\n\n        If skipkeys is false, then it is a TypeError to attempt\n        encoding of keys that are not str, int, float or None.  If\n        skipkeys is True, such items are simply skipped.\n\n        If ensure_ascii is true, the output is guaranteed to be str\n        objects with all incoming non-ASCII characters escaped.  If\n        ensure_ascii is false, the output can contain non-ASCII characters.\n\n        If check_circular is true, then lists, dicts, and custom encoded\n        objects will be checked for circular references during encoding to\n        prevent an infinite recursion (which would cause an RecursionError).\n        Otherwise, no such check takes place.\n\n        If allow_nan is true, then NaN, Infinity, and -Infinity will be\n        encoded as such.  This behavior is not JSON specification compliant,\n        but is consistent with most JavaScript based encoders and decoders.\n        Otherwise, it will be a ValueError to encode such floats.\n\n        If sort_keys is true, then the output of dictionaries will be\n        sorted by key; this is useful for regression tests to ensure\n        that JSON serializations can be compared on a day-to-day basis.\n\n        If indent is a non-negative integer, then JSON array\n        elements and object members will be pretty-printed with that\n        indent level.  An indent level of 0 will only insert newlines.\n        None is the most compact representation.\n\n        If specified, separators should be an (item_separator, key_separator)\n        tuple.  The default is (', ', ': ') if *indent* is ``None`` and\n        (',', ': ') otherwise.  To get the most compact JSON representation,\n        you should specify (',', ':') to eliminate whitespace.\n\n        If specified, default is a function that gets called for objects\n        that can't otherwise be serialized.  It should return a JSON encodable\n        version of the object or raise a ``TypeError``.\n\n        ";B=default;C=separators;D=indent;A.skipkeys=skipkeys;A.ensure_ascii=ensure_ascii;A.check_circular=check_circular;A.allow_nan=allow_nan;A.sort_keys=sort_keys;A.indent=D
+		if C is not _A:A.item_separator,A.key_separator=C
+		elif D is not _A:A.item_separator=','
+		if B is not _A:A.default=B
+	def default(A,o):'Implement this method in a subclass such that it returns\n        a serializable object for ``o``, or calls the base implementation\n        (to raise a ``TypeError``).\n\n        For example, to support arbitrary iterators, you could\n        implement default like this::\n\n            def default(self, o):\n                try:\n                    iterable = iter(o)\n                except TypeError:\n                    pass\n                else:\n                    return list(iterable)\n                # Let the base class default method raise the TypeError\n                return JSONEncoder.default(self, o)\n\n        ';raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+	def encode(B,o):
+		'Return a JSON string representation of a Python data structure.\n\n        >>> from json.encoder import JSONEncoder\n        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})\n        \'{"foo": ["bar", "baz"]}\'\n\n        '
+		if isinstance(o,str):
+			if B.ensure_ascii:return encode_basestring_ascii(o)
+			else:return encode_basestring(o)
+		A=B.iterencode(o,_one_shot=_B)
+		if not isinstance(A,(list,tuple)):A=list(A)
+		return''.join(A)
+	def iterencode(A,o,_one_shot=_C):
+		'Encode the given object and yield each string\n        representation as available.\n\n        For example::\n\n            for chunk in JSONEncoder().iterencode(bigobject):\n                mysocket.write(chunk)\n\n        ';D=_one_shot
+		if A.check_circular:B={}
+		else:B=_A
+		if A.ensure_ascii:C=encode_basestring_ascii
+		else:C=encode_basestring
+		def F(o,allow_nan=A.allow_nan,_repr=float.__repr__,_inf=INFINITY,_neginf=-INFINITY):
+			if o!=o:A='NaN'
+			elif o==_inf:A='Infinity'
+			elif o==_neginf:A='-Infinity'
+			else:return _repr(o)
+			if not allow_nan:raise ValueError('Out of range float values are not JSON compliant: '+repr(o))
+			return A
+		if D and c_make_encoder is not _A and A.indent is _A:E=c_make_encoder(B,A.default,C,A.indent,A.key_separator,A.item_separator,A.sort_keys,A.skipkeys,A.allow_nan)
+		else:E=_make_iterencode(B,A.default,C,A.indent,F,A.key_separator,A.item_separator,A.sort_keys,A.skipkeys,D)
+		return E(o,0)
+def _make_iterencode(markers,_default,_encoder,_indent,_floatstr,_key_separator,_item_separator,_sort_keys,_skipkeys,_one_shot,ValueError=ValueError,dict=dict,float=float,id=id,int=int,isinstance=isinstance,list=list,str=str,tuple=tuple,_intstr=int.__repr__):
+	P='Circular reference detected';G='false';H='true';I='null';J=_intstr;K=_item_separator;L=_floatstr;M=_encoder;D=_indent;A=markers
+	if D is not _A and not isinstance(D,str):D=' '*D
+	def Q(lst,_current_indent_level):
+		F=lst;E=_current_indent_level
+		if not F:yield'[]';return
+		if A is not _A:
+			S=id(F)
+			if S in A:raise ValueError(P)
+			A[S]=F
+		C='['
+		if D is not _A:E+=1;O=_D+D*E;U=K+O;C+=O
+		else:O=_A;U=K
+		V=_B
+		for B in F:
+			if V:V=_C
+			else:C=U
+			if isinstance(B,str):yield C+M(B)
+			elif B is _A:yield C+I
+			elif B is _B:yield C+H
+			elif B is _C:yield C+G
+			elif isinstance(B,int):yield C+J(B)
+			elif isinstance(B,float):yield C+L(B)
+			else:
+				yield C
+				if isinstance(B,(list,tuple)):T=Q(B,E)
+				elif isinstance(B,dict):T=R(B,E)
+				else:T=N(B,E)
+				yield from T
+		if O is not _A:E-=1;yield _D+D*E
+		yield']'
+		if A is not _A:del A[S]
+	def R(dct,_current_indent_level):
+		F=dct;E=_current_indent_level
+		if not F:yield'{}';return
+		if A is not _A:
+			S=id(F)
+			if S in A:raise ValueError(P)
+			A[S]=F
+		yield'{'
+		if D is not _A:E+=1;O=_D+D*E;U=K+O;yield O
+		else:O=_A;U=K
+		V=_B
+		if _sort_keys:W=sorted(F.items())
+		else:W=F.items()
+		for(B,C)in W:
+			if isinstance(B,str):0
+			elif isinstance(B,float):B=L(B)
+			elif B is _B:B=H
+			elif B is _C:B=G
+			elif B is _A:B=I
+			elif isinstance(B,int):B=J(B)
+			elif _skipkeys:continue
+			else:raise TypeError(f"keys must be str, int, float, bool or None, not {B.__class__.__name__}")
+			if V:V=_C
+			else:yield U
+			yield M(B);yield _key_separator
+			if isinstance(C,str):yield M(C)
+			elif C is _A:yield I
+			elif C is _B:yield H
+			elif C is _C:yield G
+			elif isinstance(C,int):yield J(C)
+			elif isinstance(C,float):yield L(C)
+			else:
+				if isinstance(C,(list,tuple)):T=Q(C,E)
+				elif isinstance(C,dict):T=R(C,E)
+				else:T=N(C,E)
+				yield from T
+		if O is not _A:E-=1;yield _D+D*E
+		yield'}'
+		if A is not _A:del A[S]
+	def N(o,_current_indent_level):
+		B=_current_indent_level
+		if isinstance(o,str):yield M(o)
+		elif o is _A:yield I
+		elif o is _B:yield H
+		elif o is _C:yield G
+		elif isinstance(o,int):yield J(o)
+		elif isinstance(o,float):yield L(o)
+		elif isinstance(o,(list,tuple)):yield from Q(o,B)
+		elif isinstance(o,dict):yield from R(o,B)
+		else:
+			if A is not _A:
+				C=id(o)
+				if C in A:raise ValueError(P)
+				A[C]=o
+			o=_default(o);yield from N(o,B)
+			if A is not _A:del A[C]
+	return N

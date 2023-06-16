@@ -1,99 +1,15 @@
 import re
-
-from ._functools import method_cache
-
-
-# from jaraco.text 3.5
+from._functools import method_cache
 class FoldedCase(str):
-    """
-    A case insensitive string class; behaves just like str
-    except compares equal when the only variation is case.
-
-    >>> s = FoldedCase('hello world')
-
-    >>> s == 'Hello World'
-    True
-
-    >>> 'Hello World' == s
-    True
-
-    >>> s != 'Hello World'
-    False
-
-    >>> s.index('O')
-    4
-
-    >>> s.split('O')
-    ['hell', ' w', 'rld']
-
-    >>> sorted(map(FoldedCase, ['GAMMA', 'alpha', 'Beta']))
-    ['alpha', 'Beta', 'GAMMA']
-
-    Sequence membership is straightforward.
-
-    >>> "Hello World" in [s]
-    True
-    >>> s in ["Hello World"]
-    True
-
-    You may test for set inclusion, but candidate and elements
-    must both be folded.
-
-    >>> FoldedCase("Hello World") in {s}
-    True
-    >>> s in {FoldedCase("Hello World")}
-    True
-
-    String inclusion works as long as the FoldedCase object
-    is on the right.
-
-    >>> "hello" in FoldedCase("Hello World")
-    True
-
-    But not if the FoldedCase object is on the left:
-
-    >>> FoldedCase('hello') in 'Hello World'
-    False
-
-    In that case, use in_:
-
-    >>> FoldedCase('hello').in_('Hello World')
-    True
-
-    >>> FoldedCase('hello') > FoldedCase('Hello')
-    False
-    """
-
-    def __lt__(self, other):
-        return self.lower() < other.lower()
-
-    def __gt__(self, other):
-        return self.lower() > other.lower()
-
-    def __eq__(self, other):
-        return self.lower() == other.lower()
-
-    def __ne__(self, other):
-        return self.lower() != other.lower()
-
-    def __hash__(self):
-        return hash(self.lower())
-
-    def __contains__(self, other):
-        return super().lower().__contains__(other.lower())
-
-    def in_(self, other):
-        "Does self appear in other?"
-        return self in FoldedCase(other)
-
-    # cache lower since it's likely to be called frequently.
-    @method_cache
-    def lower(self):
-        return super().lower()
-
-    def index(self, sub):
-        return self.lower().index(sub.lower())
-
-    def split(self, splitter=' ', maxsplit=0):
-        pattern = re.compile(re.escape(splitter), re.I)
-        return pattern.split(self, maxsplit)
+	'\n    A case insensitive string class; behaves just like str\n    except compares equal when the only variation is case.\n\n    >>> s = FoldedCase(\'hello world\')\n\n    >>> s == \'Hello World\'\n    True\n\n    >>> \'Hello World\' == s\n    True\n\n    >>> s != \'Hello World\'\n    False\n\n    >>> s.index(\'O\')\n    4\n\n    >>> s.split(\'O\')\n    [\'hell\', \' w\', \'rld\']\n\n    >>> sorted(map(FoldedCase, [\'GAMMA\', \'alpha\', \'Beta\']))\n    [\'alpha\', \'Beta\', \'GAMMA\']\n\n    Sequence membership is straightforward.\n\n    >>> "Hello World" in [s]\n    True\n    >>> s in ["Hello World"]\n    True\n\n    You may test for set inclusion, but candidate and elements\n    must both be folded.\n\n    >>> FoldedCase("Hello World") in {s}\n    True\n    >>> s in {FoldedCase("Hello World")}\n    True\n\n    String inclusion works as long as the FoldedCase object\n    is on the right.\n\n    >>> "hello" in FoldedCase("Hello World")\n    True\n\n    But not if the FoldedCase object is on the left:\n\n    >>> FoldedCase(\'hello\') in \'Hello World\'\n    False\n\n    In that case, use in_:\n\n    >>> FoldedCase(\'hello\').in_(\'Hello World\')\n    True\n\n    >>> FoldedCase(\'hello\') > FoldedCase(\'Hello\')\n    False\n    '
+	def __lt__(A,other):return A.lower()<other.lower()
+	def __gt__(A,other):return A.lower()>other.lower()
+	def __eq__(A,other):return A.lower()==other.lower()
+	def __ne__(A,other):return A.lower()!=other.lower()
+	def __hash__(A):return hash(A.lower())
+	def __contains__(A,other):return super().lower().__contains__(other.lower())
+	def in_(A,other):'Does self appear in other?';return A in FoldedCase(other)
+	@method_cache
+	def lower(self):return super().lower()
+	def index(A,sub):return A.lower().index(sub.lower())
+	def split(A,splitter=' ',maxsplit=0):B=re.compile(re.escape(splitter),re.I);return B.split(A,maxsplit)

@@ -1,531 +1,215 @@
-"""Stuff to parse Sun and NeXT audio files.
-
-An audio file consists of a header followed by the data.  The structure
-of the header is as follows.
-
-        +---------------+
-        | magic word    |
-        +---------------+
-        | header size   |
-        +---------------+
-        | data size     |
-        +---------------+
-        | encoding      |
-        +---------------+
-        | sample rate   |
-        +---------------+
-        | # of channels |
-        +---------------+
-        | info          |
-        |               |
-        +---------------+
-
-The magic word consists of the 4 characters '.snd'.  Apart from the
-info field, all header fields are 4 bytes in size.  They are all
-32-bit unsigned integers encoded in big-endian byte order.
-
-The header size really gives the start of the data.
-The data size is the physical size of the data.  From the other
-parameters the number of frames can be calculated.
-The encoding gives the way in which audio samples are encoded.
-Possible values are listed below.
-The info field currently consists of an ASCII string giving a
-human-readable description of the audio file.  The info field is
-padded with NUL bytes to the header size.
-
-Usage.
-
-Reading audio files:
-        f = sunau.open(file, 'r')
-where file is either the name of a file or an open file pointer.
-The open file pointer must have methods read(), seek(), and close().
-When the setpos() and rewind() methods are not used, the seek()
-method is not  necessary.
-
-This returns an instance of a class with the following public methods:
-        getnchannels()  -- returns number of audio channels (1 for
-                           mono, 2 for stereo)
-        getsampwidth()  -- returns sample width in bytes
-        getframerate()  -- returns sampling frequency
-        getnframes()    -- returns number of audio frames
-        getcomptype()   -- returns compression type ('NONE' or 'ULAW')
-        getcompname()   -- returns human-readable version of
-                           compression type ('not compressed' matches 'NONE')
-        getparams()     -- returns a namedtuple consisting of all of the
-                           above in the above order
-        getmarkers()    -- returns None (for compatibility with the
-                           aifc module)
-        getmark(id)     -- raises an error since the mark does not
-                           exist (for compatibility with the aifc module)
-        readframes(n)   -- returns at most n frames of audio
-        rewind()        -- rewind to the beginning of the audio stream
-        setpos(pos)     -- seek to the specified position
-        tell()          -- return the current position
-        close()         -- close the instance (make it unusable)
-The position returned by tell() and the position given to setpos()
-are compatible and have nothing to do with the actual position in the
-file.
-The close() method is called automatically when the class instance
-is destroyed.
-
-Writing audio files:
-        f = sunau.open(file, 'w')
-where file is either the name of a file or an open file pointer.
-The open file pointer must have methods write(), tell(), seek(), and
-close().
-
-This returns an instance of a class with the following public methods:
-        setnchannels(n) -- set the number of channels
-        setsampwidth(n) -- set the sample width
-        setframerate(n) -- set the frame rate
-        setnframes(n)   -- set the number of frames
-        setcomptype(type, name)
-                        -- set the compression type and the
-                           human-readable compression type
-        setparams(tuple)-- set all parameters at once
-        tell()          -- return current position in output file
-        writeframesraw(data)
-                        -- write audio frames without pathing up the
-                           file header
-        writeframes(data)
-                        -- write audio frames and patch up the file header
-        close()         -- patch up the file header and close the
-                           output file
-You should set the parameters before the first writeframesraw or
-writeframes.  The total number of frames does not need to be set,
-but when it is set to the correct value, the header does not have to
-be patched up.
-It is best to first set all parameters, perhaps possibly the
-compression type, and then write audio frames using writeframesraw.
-When all frames have been written, either call writeframes(b'') or
-close() to patch up the sizes in the header.
-The close() method is called automatically when the class instance
-is destroyed.
-"""
-
+"Stuff to parse Sun and NeXT audio files.\n\nAn audio file consists of a header followed by the data.  The structure\nof the header is as follows.\n\n        +---------------+\n        | magic word    |\n        +---------------+\n        | header size   |\n        +---------------+\n        | data size     |\n        +---------------+\n        | encoding      |\n        +---------------+\n        | sample rate   |\n        +---------------+\n        | # of channels |\n        +---------------+\n        | info          |\n        |               |\n        +---------------+\n\nThe magic word consists of the 4 characters '.snd'.  Apart from the\ninfo field, all header fields are 4 bytes in size.  They are all\n32-bit unsigned integers encoded in big-endian byte order.\n\nThe header size really gives the start of the data.\nThe data size is the physical size of the data.  From the other\nparameters the number of frames can be calculated.\nThe encoding gives the way in which audio samples are encoded.\nPossible values are listed below.\nThe info field currently consists of an ASCII string giving a\nhuman-readable description of the audio file.  The info field is\npadded with NUL bytes to the header size.\n\nUsage.\n\nReading audio files:\n        f = sunau.open(file, 'r')\nwhere file is either the name of a file or an open file pointer.\nThe open file pointer must have methods read(), seek(), and close().\nWhen the setpos() and rewind() methods are not used, the seek()\nmethod is not  necessary.\n\nThis returns an instance of a class with the following public methods:\n        getnchannels()  -- returns number of audio channels (1 for\n                           mono, 2 for stereo)\n        getsampwidth()  -- returns sample width in bytes\n        getframerate()  -- returns sampling frequency\n        getnframes()    -- returns number of audio frames\n        getcomptype()   -- returns compression type ('NONE' or 'ULAW')\n        getcompname()   -- returns human-readable version of\n                           compression type ('not compressed' matches 'NONE')\n        getparams()     -- returns a namedtuple consisting of all of the\n                           above in the above order\n        getmarkers()    -- returns None (for compatibility with the\n                           aifc module)\n        getmark(id)     -- raises an error since the mark does not\n                           exist (for compatibility with the aifc module)\n        readframes(n)   -- returns at most n frames of audio\n        rewind()        -- rewind to the beginning of the audio stream\n        setpos(pos)     -- seek to the specified position\n        tell()          -- return the current position\n        close()         -- close the instance (make it unusable)\nThe position returned by tell() and the position given to setpos()\nare compatible and have nothing to do with the actual position in the\nfile.\nThe close() method is called automatically when the class instance\nis destroyed.\n\nWriting audio files:\n        f = sunau.open(file, 'w')\nwhere file is either the name of a file or an open file pointer.\nThe open file pointer must have methods write(), tell(), seek(), and\nclose().\n\nThis returns an instance of a class with the following public methods:\n        setnchannels(n) -- set the number of channels\n        setsampwidth(n) -- set the sample width\n        setframerate(n) -- set the frame rate\n        setnframes(n)   -- set the number of frames\n        setcomptype(type, name)\n                        -- set the compression type and the\n                           human-readable compression type\n        setparams(tuple)-- set all parameters at once\n        tell()          -- return current position in output file\n        writeframesraw(data)\n                        -- write audio frames without pathing up the\n                           file header\n        writeframes(data)\n                        -- write audio frames and patch up the file header\n        close()         -- patch up the file header and close the\n                           output file\nYou should set the parameters before the first writeframesraw or\nwriteframes.  The total number of frames does not need to be set,\nbut when it is set to the correct value, the header does not have to\nbe patched up.\nIt is best to first set all parameters, perhaps possibly the\ncompression type, and then write audio frames using writeframesraw.\nWhen all frames have been written, either call writeframes(b'') or\nclose() to patch up the sizes in the header.\nThe close() method is called automatically when the class instance\nis destroyed.\n"
+_I='sample width not specified'
+_H='not compressed'
+_G='CCITT G.711 A-law'
+_F='CCITT G.711 u-law'
+_E='cannot seek'
+_D='NONE'
+_C='cannot change parameters after starting to write'
+_B='ULAW'
+_A=None
 from collections import namedtuple
 import warnings
-
-_sunau_params = namedtuple('_sunau_params',
-                           'nchannels sampwidth framerate nframes comptype compname')
-
-# from <multimedia/audio_filehdr.h>
-AUDIO_FILE_MAGIC = 0x2e736e64
-AUDIO_FILE_ENCODING_MULAW_8 = 1
-AUDIO_FILE_ENCODING_LINEAR_8 = 2
-AUDIO_FILE_ENCODING_LINEAR_16 = 3
-AUDIO_FILE_ENCODING_LINEAR_24 = 4
-AUDIO_FILE_ENCODING_LINEAR_32 = 5
-AUDIO_FILE_ENCODING_FLOAT = 6
-AUDIO_FILE_ENCODING_DOUBLE = 7
-AUDIO_FILE_ENCODING_ADPCM_G721 = 23
-AUDIO_FILE_ENCODING_ADPCM_G722 = 24
-AUDIO_FILE_ENCODING_ADPCM_G723_3 = 25
-AUDIO_FILE_ENCODING_ADPCM_G723_5 = 26
-AUDIO_FILE_ENCODING_ALAW_8 = 27
-
-# from <multimedia/audio_hdr.h>
-AUDIO_UNKNOWN_SIZE = 0xFFFFFFFF        # ((unsigned)(~0))
-
-_simple_encodings = [AUDIO_FILE_ENCODING_MULAW_8,
-                     AUDIO_FILE_ENCODING_LINEAR_8,
-                     AUDIO_FILE_ENCODING_LINEAR_16,
-                     AUDIO_FILE_ENCODING_LINEAR_24,
-                     AUDIO_FILE_ENCODING_LINEAR_32,
-                     AUDIO_FILE_ENCODING_ALAW_8]
-
-class Error(Exception):
-    pass
-
+_sunau_params=namedtuple('_sunau_params','nchannels sampwidth framerate nframes comptype compname')
+AUDIO_FILE_MAGIC=779316836
+AUDIO_FILE_ENCODING_MULAW_8=1
+AUDIO_FILE_ENCODING_LINEAR_8=2
+AUDIO_FILE_ENCODING_LINEAR_16=3
+AUDIO_FILE_ENCODING_LINEAR_24=4
+AUDIO_FILE_ENCODING_LINEAR_32=5
+AUDIO_FILE_ENCODING_FLOAT=6
+AUDIO_FILE_ENCODING_DOUBLE=7
+AUDIO_FILE_ENCODING_ADPCM_G721=23
+AUDIO_FILE_ENCODING_ADPCM_G722=24
+AUDIO_FILE_ENCODING_ADPCM_G723_3=25
+AUDIO_FILE_ENCODING_ADPCM_G723_5=26
+AUDIO_FILE_ENCODING_ALAW_8=27
+AUDIO_UNKNOWN_SIZE=4294967295
+_simple_encodings=[AUDIO_FILE_ENCODING_MULAW_8,AUDIO_FILE_ENCODING_LINEAR_8,AUDIO_FILE_ENCODING_LINEAR_16,AUDIO_FILE_ENCODING_LINEAR_24,AUDIO_FILE_ENCODING_LINEAR_32,AUDIO_FILE_ENCODING_ALAW_8]
+class Error(Exception):0
 def _read_u32(file):
-    x = 0
-    for i in range(4):
-        byte = file.read(1)
-        if not byte:
-            raise EOFError
-        x = x*256 + ord(byte)
-    return x
-
-def _write_u32(file, x):
-    data = []
-    for i in range(4):
-        d, m = divmod(x, 256)
-        data.insert(0, int(m))
-        x = d
-    file.write(bytes(data))
-
+	A=0
+	for C in range(4):
+		B=file.read(1)
+		if not B:raise EOFError
+		A=A*256+ord(B)
+	return A
+def _write_u32(file,x):
+	A=[]
+	for D in range(4):B,C=divmod(x,256);A.insert(0,int(C));x=B
+	file.write(bytes(A))
 class Au_read:
-
-    def __init__(self, f):
-        if type(f) == type(''):
-            import builtins
-            f = builtins.open(f, 'rb')
-            self._opened = True
-        else:
-            self._opened = False
-        self.initfp(f)
-
-    def __del__(self):
-        if self._file:
-            self.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-    def initfp(self, file):
-        self._file = file
-        self._soundpos = 0
-        magic = int(_read_u32(file))
-        if magic != AUDIO_FILE_MAGIC:
-            raise Error('bad magic number')
-        self._hdr_size = int(_read_u32(file))
-        if self._hdr_size < 24:
-            raise Error('header size too small')
-        if self._hdr_size > 100:
-            raise Error('header size ridiculously large')
-        self._data_size = _read_u32(file)
-        if self._data_size != AUDIO_UNKNOWN_SIZE:
-            self._data_size = int(self._data_size)
-        self._encoding = int(_read_u32(file))
-        if self._encoding not in _simple_encodings:
-            raise Error('encoding not (yet) supported')
-        if self._encoding in (AUDIO_FILE_ENCODING_MULAW_8,
-                  AUDIO_FILE_ENCODING_ALAW_8):
-            self._sampwidth = 2
-            self._framesize = 1
-        elif self._encoding == AUDIO_FILE_ENCODING_LINEAR_8:
-            self._framesize = self._sampwidth = 1
-        elif self._encoding == AUDIO_FILE_ENCODING_LINEAR_16:
-            self._framesize = self._sampwidth = 2
-        elif self._encoding == AUDIO_FILE_ENCODING_LINEAR_24:
-            self._framesize = self._sampwidth = 3
-        elif self._encoding == AUDIO_FILE_ENCODING_LINEAR_32:
-            self._framesize = self._sampwidth = 4
-        else:
-            raise Error('unknown encoding')
-        self._framerate = int(_read_u32(file))
-        self._nchannels = int(_read_u32(file))
-        if not self._nchannels:
-            raise Error('bad # of channels')
-        self._framesize = self._framesize * self._nchannels
-        if self._hdr_size > 24:
-            self._info = file.read(self._hdr_size - 24)
-            self._info, _, _ = self._info.partition(b'\0')
-        else:
-            self._info = b''
-        try:
-            self._data_pos = file.tell()
-        except (AttributeError, OSError):
-            self._data_pos = None
-
-    def getfp(self):
-        return self._file
-
-    def getnchannels(self):
-        return self._nchannels
-
-    def getsampwidth(self):
-        return self._sampwidth
-
-    def getframerate(self):
-        return self._framerate
-
-    def getnframes(self):
-        if self._data_size == AUDIO_UNKNOWN_SIZE:
-            return AUDIO_UNKNOWN_SIZE
-        if self._encoding in _simple_encodings:
-            return self._data_size // self._framesize
-        return 0                # XXX--must do some arithmetic here
-
-    def getcomptype(self):
-        if self._encoding == AUDIO_FILE_ENCODING_MULAW_8:
-            return 'ULAW'
-        elif self._encoding == AUDIO_FILE_ENCODING_ALAW_8:
-            return 'ALAW'
-        else:
-            return 'NONE'
-
-    def getcompname(self):
-        if self._encoding == AUDIO_FILE_ENCODING_MULAW_8:
-            return 'CCITT G.711 u-law'
-        elif self._encoding == AUDIO_FILE_ENCODING_ALAW_8:
-            return 'CCITT G.711 A-law'
-        else:
-            return 'not compressed'
-
-    def getparams(self):
-        return _sunau_params(self.getnchannels(), self.getsampwidth(),
-                  self.getframerate(), self.getnframes(),
-                  self.getcomptype(), self.getcompname())
-
-    def getmarkers(self):
-        return None
-
-    def getmark(self, id):
-        raise Error('no marks')
-
-    def readframes(self, nframes):
-        if self._encoding in _simple_encodings:
-            if nframes == AUDIO_UNKNOWN_SIZE:
-                data = self._file.read()
-            else:
-                data = self._file.read(nframes * self._framesize)
-            self._soundpos += len(data) // self._framesize
-            if self._encoding == AUDIO_FILE_ENCODING_MULAW_8:
-                import audioop
-                data = audioop.ulaw2lin(data, self._sampwidth)
-            return data
-        return None             # XXX--not implemented yet
-
-    def rewind(self):
-        if self._data_pos is None:
-            raise OSError('cannot seek')
-        self._file.seek(self._data_pos)
-        self._soundpos = 0
-
-    def tell(self):
-        return self._soundpos
-
-    def setpos(self, pos):
-        if pos < 0 or pos > self.getnframes():
-            raise Error('position not in range')
-        if self._data_pos is None:
-            raise OSError('cannot seek')
-        self._file.seek(self._data_pos + pos * self._framesize)
-        self._soundpos = pos
-
-    def close(self):
-        file = self._file
-        if file:
-            self._file = None
-            if self._opened:
-                file.close()
-
+	def __init__(A,f):
+		if type(f)==type(''):import builtins as B;f=B.open(f,'rb');A._opened=True
+		else:A._opened=False
+		A.initfp(f)
+	def __del__(A):
+		if A._file:A.close()
+	def __enter__(A):return A
+	def __exit__(A,*B):A.close()
+	def initfp(A,file):
+		B=file;A._file=B;A._soundpos=0;C=int(_read_u32(B))
+		if C!=AUDIO_FILE_MAGIC:raise Error('bad magic number')
+		A._hdr_size=int(_read_u32(B))
+		if A._hdr_size<24:raise Error('header size too small')
+		if A._hdr_size>100:raise Error('header size ridiculously large')
+		A._data_size=_read_u32(B)
+		if A._data_size!=AUDIO_UNKNOWN_SIZE:A._data_size=int(A._data_size)
+		A._encoding=int(_read_u32(B))
+		if A._encoding not in _simple_encodings:raise Error('encoding not (yet) supported')
+		if A._encoding in(AUDIO_FILE_ENCODING_MULAW_8,AUDIO_FILE_ENCODING_ALAW_8):A._sampwidth=2;A._framesize=1
+		elif A._encoding==AUDIO_FILE_ENCODING_LINEAR_8:A._framesize=A._sampwidth=1
+		elif A._encoding==AUDIO_FILE_ENCODING_LINEAR_16:A._framesize=A._sampwidth=2
+		elif A._encoding==AUDIO_FILE_ENCODING_LINEAR_24:A._framesize=A._sampwidth=3
+		elif A._encoding==AUDIO_FILE_ENCODING_LINEAR_32:A._framesize=A._sampwidth=4
+		else:raise Error('unknown encoding')
+		A._framerate=int(_read_u32(B));A._nchannels=int(_read_u32(B))
+		if not A._nchannels:raise Error('bad # of channels')
+		A._framesize=A._framesize*A._nchannels
+		if A._hdr_size>24:A._info=B.read(A._hdr_size-24);A._info,D,D=A._info.partition(b'\x00')
+		else:A._info=b''
+		try:A._data_pos=B.tell()
+		except(AttributeError,OSError):A._data_pos=_A
+	def getfp(A):return A._file
+	def getnchannels(A):return A._nchannels
+	def getsampwidth(A):return A._sampwidth
+	def getframerate(A):return A._framerate
+	def getnframes(A):
+		if A._data_size==AUDIO_UNKNOWN_SIZE:return AUDIO_UNKNOWN_SIZE
+		if A._encoding in _simple_encodings:return A._data_size//A._framesize
+		return 0
+	def getcomptype(A):
+		if A._encoding==AUDIO_FILE_ENCODING_MULAW_8:return _B
+		elif A._encoding==AUDIO_FILE_ENCODING_ALAW_8:return'ALAW'
+		else:return _D
+	def getcompname(A):
+		if A._encoding==AUDIO_FILE_ENCODING_MULAW_8:return _F
+		elif A._encoding==AUDIO_FILE_ENCODING_ALAW_8:return _G
+		else:return _H
+	def getparams(A):return _sunau_params(A.getnchannels(),A.getsampwidth(),A.getframerate(),A.getnframes(),A.getcomptype(),A.getcompname())
+	def getmarkers(A):0
+	def getmark(A,id):raise Error('no marks')
+	def readframes(A,nframes):
+		C=nframes
+		if A._encoding in _simple_encodings:
+			if C==AUDIO_UNKNOWN_SIZE:B=A._file.read()
+			else:B=A._file.read(C*A._framesize)
+			A._soundpos+=len(B)//A._framesize
+			if A._encoding==AUDIO_FILE_ENCODING_MULAW_8:import audioop as D;B=D.ulaw2lin(B,A._sampwidth)
+			return B
+	def rewind(A):
+		if A._data_pos is _A:raise OSError(_E)
+		A._file.seek(A._data_pos);A._soundpos=0
+	def tell(A):return A._soundpos
+	def setpos(A,pos):
+		B=pos
+		if B<0 or B>A.getnframes():raise Error('position not in range')
+		if A._data_pos is _A:raise OSError(_E)
+		A._file.seek(A._data_pos+B*A._framesize);A._soundpos=B
+	def close(A):
+		B=A._file
+		if B:
+			A._file=_A
+			if A._opened:B.close()
 class Au_write:
-
-    def __init__(self, f):
-        if type(f) == type(''):
-            import builtins
-            f = builtins.open(f, 'wb')
-            self._opened = True
-        else:
-            self._opened = False
-        self.initfp(f)
-
-    def __del__(self):
-        if self._file:
-            self.close()
-        self._file = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-    def initfp(self, file):
-        self._file = file
-        self._framerate = 0
-        self._nchannels = 0
-        self._sampwidth = 0
-        self._framesize = 0
-        self._nframes = AUDIO_UNKNOWN_SIZE
-        self._nframeswritten = 0
-        self._datawritten = 0
-        self._datalength = 0
-        self._info = b''
-        self._comptype = 'ULAW' # default is U-law
-
-    def setnchannels(self, nchannels):
-        if self._nframeswritten:
-            raise Error('cannot change parameters after starting to write')
-        if nchannels not in (1, 2, 4):
-            raise Error('only 1, 2, or 4 channels supported')
-        self._nchannels = nchannels
-
-    def getnchannels(self):
-        if not self._nchannels:
-            raise Error('number of channels not set')
-        return self._nchannels
-
-    def setsampwidth(self, sampwidth):
-        if self._nframeswritten:
-            raise Error('cannot change parameters after starting to write')
-        if sampwidth not in (1, 2, 3, 4):
-            raise Error('bad sample width')
-        self._sampwidth = sampwidth
-
-    def getsampwidth(self):
-        if not self._framerate:
-            raise Error('sample width not specified')
-        return self._sampwidth
-
-    def setframerate(self, framerate):
-        if self._nframeswritten:
-            raise Error('cannot change parameters after starting to write')
-        self._framerate = framerate
-
-    def getframerate(self):
-        if not self._framerate:
-            raise Error('frame rate not set')
-        return self._framerate
-
-    def setnframes(self, nframes):
-        if self._nframeswritten:
-            raise Error('cannot change parameters after starting to write')
-        if nframes < 0:
-            raise Error('# of frames cannot be negative')
-        self._nframes = nframes
-
-    def getnframes(self):
-        return self._nframeswritten
-
-    def setcomptype(self, type, name):
-        if type in ('NONE', 'ULAW'):
-            self._comptype = type
-        else:
-            raise Error('unknown compression type')
-
-    def getcomptype(self):
-        return self._comptype
-
-    def getcompname(self):
-        if self._comptype == 'ULAW':
-            return 'CCITT G.711 u-law'
-        elif self._comptype == 'ALAW':
-            return 'CCITT G.711 A-law'
-        else:
-            return 'not compressed'
-
-    def setparams(self, params):
-        nchannels, sampwidth, framerate, nframes, comptype, compname = params
-        self.setnchannels(nchannels)
-        self.setsampwidth(sampwidth)
-        self.setframerate(framerate)
-        self.setnframes(nframes)
-        self.setcomptype(comptype, compname)
-
-    def getparams(self):
-        return _sunau_params(self.getnchannels(), self.getsampwidth(),
-                  self.getframerate(), self.getnframes(),
-                  self.getcomptype(), self.getcompname())
-
-    def tell(self):
-        return self._nframeswritten
-
-    def writeframesraw(self, data):
-        if not isinstance(data, (bytes, bytearray)):
-            data = memoryview(data).cast('B')
-        self._ensure_header_written()
-        if self._comptype == 'ULAW':
-            import audioop
-            data = audioop.lin2ulaw(data, self._sampwidth)
-        nframes = len(data) // self._framesize
-        self._file.write(data)
-        self._nframeswritten = self._nframeswritten + nframes
-        self._datawritten = self._datawritten + len(data)
-
-    def writeframes(self, data):
-        self.writeframesraw(data)
-        if self._nframeswritten != self._nframes or \
-                  self._datalength != self._datawritten:
-            self._patchheader()
-
-    def close(self):
-        if self._file:
-            try:
-                self._ensure_header_written()
-                if self._nframeswritten != self._nframes or \
-                        self._datalength != self._datawritten:
-                    self._patchheader()
-                self._file.flush()
-            finally:
-                file = self._file
-                self._file = None
-                if self._opened:
-                    file.close()
-
-    #
-    # private methods
-    #
-
-    def _ensure_header_written(self):
-        if not self._nframeswritten:
-            if not self._nchannels:
-                raise Error('# of channels not specified')
-            if not self._sampwidth:
-                raise Error('sample width not specified')
-            if not self._framerate:
-                raise Error('frame rate not specified')
-            self._write_header()
-
-    def _write_header(self):
-        if self._comptype == 'NONE':
-            if self._sampwidth == 1:
-                encoding = AUDIO_FILE_ENCODING_LINEAR_8
-                self._framesize = 1
-            elif self._sampwidth == 2:
-                encoding = AUDIO_FILE_ENCODING_LINEAR_16
-                self._framesize = 2
-            elif self._sampwidth == 3:
-                encoding = AUDIO_FILE_ENCODING_LINEAR_24
-                self._framesize = 3
-            elif self._sampwidth == 4:
-                encoding = AUDIO_FILE_ENCODING_LINEAR_32
-                self._framesize = 4
-            else:
-                raise Error('internal error')
-        elif self._comptype == 'ULAW':
-            encoding = AUDIO_FILE_ENCODING_MULAW_8
-            self._framesize = 1
-        else:
-            raise Error('internal error')
-        self._framesize = self._framesize * self._nchannels
-        _write_u32(self._file, AUDIO_FILE_MAGIC)
-        header_size = 25 + len(self._info)
-        header_size = (header_size + 7) & ~7
-        _write_u32(self._file, header_size)
-        if self._nframes == AUDIO_UNKNOWN_SIZE:
-            length = AUDIO_UNKNOWN_SIZE
-        else:
-            length = self._nframes * self._framesize
-        try:
-            self._form_length_pos = self._file.tell()
-        except (AttributeError, OSError):
-            self._form_length_pos = None
-        _write_u32(self._file, length)
-        self._datalength = length
-        _write_u32(self._file, encoding)
-        _write_u32(self._file, self._framerate)
-        _write_u32(self._file, self._nchannels)
-        self._file.write(self._info)
-        self._file.write(b'\0'*(header_size - len(self._info) - 24))
-
-    def _patchheader(self):
-        if self._form_length_pos is None:
-            raise OSError('cannot seek')
-        self._file.seek(self._form_length_pos)
-        _write_u32(self._file, self._datawritten)
-        self._datalength = self._datawritten
-        self._file.seek(0, 2)
-
-def open(f, mode=None):
-    if mode is None:
-        if hasattr(f, 'mode'):
-            mode = f.mode
-        else:
-            mode = 'rb'
-    if mode in ('r', 'rb'):
-        return Au_read(f)
-    elif mode in ('w', 'wb'):
-        return Au_write(f)
-    else:
-        raise Error("mode must be 'r', 'rb', 'w', or 'wb'")
-
-def openfp(f, mode=None):
-    warnings.warn("sunau.openfp is deprecated since Python 3.7. "
-                  "Use sunau.open instead.", DeprecationWarning, stacklevel=2)
-    return open(f, mode=mode)
+	def __init__(A,f):
+		if type(f)==type(''):import builtins as B;f=B.open(f,'wb');A._opened=True
+		else:A._opened=False
+		A.initfp(f)
+	def __del__(A):
+		if A._file:A.close()
+		A._file=_A
+	def __enter__(A):return A
+	def __exit__(A,*B):A.close()
+	def initfp(A,file):A._file=file;A._framerate=0;A._nchannels=0;A._sampwidth=0;A._framesize=0;A._nframes=AUDIO_UNKNOWN_SIZE;A._nframeswritten=0;A._datawritten=0;A._datalength=0;A._info=b'';A._comptype=_B
+	def setnchannels(A,nchannels):
+		B=nchannels
+		if A._nframeswritten:raise Error(_C)
+		if B not in(1,2,4):raise Error('only 1, 2, or 4 channels supported')
+		A._nchannels=B
+	def getnchannels(A):
+		if not A._nchannels:raise Error('number of channels not set')
+		return A._nchannels
+	def setsampwidth(A,sampwidth):
+		B=sampwidth
+		if A._nframeswritten:raise Error(_C)
+		if B not in(1,2,3,4):raise Error('bad sample width')
+		A._sampwidth=B
+	def getsampwidth(A):
+		if not A._framerate:raise Error(_I)
+		return A._sampwidth
+	def setframerate(A,framerate):
+		if A._nframeswritten:raise Error(_C)
+		A._framerate=framerate
+	def getframerate(A):
+		if not A._framerate:raise Error('frame rate not set')
+		return A._framerate
+	def setnframes(A,nframes):
+		B=nframes
+		if A._nframeswritten:raise Error(_C)
+		if B<0:raise Error('# of frames cannot be negative')
+		A._nframes=B
+	def getnframes(A):return A._nframeswritten
+	def setcomptype(A,type,name):
+		if type in(_D,_B):A._comptype=type
+		else:raise Error('unknown compression type')
+	def getcomptype(A):return A._comptype
+	def getcompname(A):
+		if A._comptype==_B:return _F
+		elif A._comptype=='ALAW':return _G
+		else:return _H
+	def setparams(A,params):B,C,D,E,F,G=params;A.setnchannels(B);A.setsampwidth(C);A.setframerate(D);A.setnframes(E);A.setcomptype(F,G)
+	def getparams(A):return _sunau_params(A.getnchannels(),A.getsampwidth(),A.getframerate(),A.getnframes(),A.getcomptype(),A.getcompname())
+	def tell(A):return A._nframeswritten
+	def writeframesraw(A,data):
+		B=data
+		if not isinstance(B,(bytes,bytearray)):B=memoryview(B).cast('B')
+		A._ensure_header_written()
+		if A._comptype==_B:import audioop as C;B=C.lin2ulaw(B,A._sampwidth)
+		D=len(B)//A._framesize;A._file.write(B);A._nframeswritten=A._nframeswritten+D;A._datawritten=A._datawritten+len(B)
+	def writeframes(A,data):
+		A.writeframesraw(data)
+		if A._nframeswritten!=A._nframes or A._datalength!=A._datawritten:A._patchheader()
+	def close(A):
+		if A._file:
+			try:
+				A._ensure_header_written()
+				if A._nframeswritten!=A._nframes or A._datalength!=A._datawritten:A._patchheader()
+				A._file.flush()
+			finally:
+				B=A._file;A._file=_A
+				if A._opened:B.close()
+	def _ensure_header_written(A):
+		if not A._nframeswritten:
+			if not A._nchannels:raise Error('# of channels not specified')
+			if not A._sampwidth:raise Error(_I)
+			if not A._framerate:raise Error('frame rate not specified')
+			A._write_header()
+	def _write_header(A):
+		E='internal error'
+		if A._comptype==_D:
+			if A._sampwidth==1:B=AUDIO_FILE_ENCODING_LINEAR_8;A._framesize=1
+			elif A._sampwidth==2:B=AUDIO_FILE_ENCODING_LINEAR_16;A._framesize=2
+			elif A._sampwidth==3:B=AUDIO_FILE_ENCODING_LINEAR_24;A._framesize=3
+			elif A._sampwidth==4:B=AUDIO_FILE_ENCODING_LINEAR_32;A._framesize=4
+			else:raise Error(E)
+		elif A._comptype==_B:B=AUDIO_FILE_ENCODING_MULAW_8;A._framesize=1
+		else:raise Error(E)
+		A._framesize=A._framesize*A._nchannels;_write_u32(A._file,AUDIO_FILE_MAGIC);C=25+len(A._info);C=C+7&~7;_write_u32(A._file,C)
+		if A._nframes==AUDIO_UNKNOWN_SIZE:D=AUDIO_UNKNOWN_SIZE
+		else:D=A._nframes*A._framesize
+		try:A._form_length_pos=A._file.tell()
+		except(AttributeError,OSError):A._form_length_pos=_A
+		_write_u32(A._file,D);A._datalength=D;_write_u32(A._file,B);_write_u32(A._file,A._framerate);_write_u32(A._file,A._nchannels);A._file.write(A._info);A._file.write(b'\x00'*(C-len(A._info)-24))
+	def _patchheader(A):
+		if A._form_length_pos is _A:raise OSError(_E)
+		A._file.seek(A._form_length_pos);_write_u32(A._file,A._datawritten);A._datalength=A._datawritten;A._file.seek(0,2)
+def open(f,mode=_A):
+	A=mode
+	if A is _A:
+		if hasattr(f,'mode'):A=f.mode
+		else:A='rb'
+	if A in('r','rb'):return Au_read(f)
+	elif A in('w','wb'):return Au_write(f)
+	else:raise Error("mode must be 'r', 'rb', 'w', or 'wb'")
+def openfp(f,mode=_A):warnings.warn('sunau.openfp is deprecated since Python 3.7. Use sunau.open instead.',DeprecationWarning,stacklevel=2);return open(f,mode=mode)

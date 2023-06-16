@@ -1,122 +1,43 @@
-import collections
-import operator
-import pathlib
-import zipfile
-
-from . import abc
-
-from ._itertools import unique_everseen
-
-
-def remove_duplicates(items):
-    return iter(collections.OrderedDict.fromkeys(items))
-
-
+import collections,operator,pathlib,zipfile
+from.import abc
+from._itertools import unique_everseen
+def remove_duplicates(items):return iter(collections.OrderedDict.fromkeys(items))
 class FileReader(abc.TraversableResources):
-    def __init__(self, loader):
-        self.path = pathlib.Path(loader.path).parent
-
-    def resource_path(self, resource):
-        """
-        Return the file system path to prevent
-        `resources.path()` from creating a temporary
-        copy.
-        """
-        return str(self.path.joinpath(resource))
-
-    def files(self):
-        return self.path
-
-
+	def __init__(A,loader):A.path=pathlib.Path(loader.path).parent
+	def resource_path(A,resource):'\n        Return the file system path to prevent\n        `resources.path()` from creating a temporary\n        copy.\n        ';return str(A.path.joinpath(resource))
+	def files(A):return A.path
 class ZipReader(abc.TraversableResources):
-    def __init__(self, loader, module):
-        _, _, name = module.rpartition('.')
-        self.prefix = loader.prefix.replace('\\', '/') + name + '/'
-        self.archive = loader.archive
-
-    def open_resource(self, resource):
-        try:
-            return super().open_resource(resource)
-        except KeyError as exc:
-            raise FileNotFoundError(exc.args[0])
-
-    def is_resource(self, path):
-        # workaround for `zipfile.Path.is_file` returning true
-        # for non-existent paths.
-        target = self.files().joinpath(path)
-        return target.is_file() and target.exists()
-
-    def files(self):
-        return zipfile.Path(self.archive, self.prefix)
-
-
+	def __init__(A,loader,module):B=loader;C,C,D=module.rpartition('.');A.prefix=B.prefix.replace('\\','/')+D+'/';A.archive=B.archive
+	def open_resource(B,resource):
+		try:return super().open_resource(resource)
+		except KeyError as A:raise FileNotFoundError(A.args[0])
+	def is_resource(B,path):A=B.files().joinpath(path);return A.is_file()and A.exists()
+	def files(A):return zipfile.Path(A.archive,A.prefix)
 class MultiplexedPath(abc.Traversable):
-    """
-    Given a series of Traversable objects, implement a merged
-    version of the interface across all objects. Useful for
-    namespace packages which may be multihomed at a single
-    name.
-    """
-
-    def __init__(self, *paths):
-        self._paths = list(map(pathlib.Path, remove_duplicates(paths)))
-        if not self._paths:
-            message = 'MultiplexedPath must contain at least one path'
-            raise FileNotFoundError(message)
-        if not all(path.is_dir() for path in self._paths):
-            raise NotADirectoryError('MultiplexedPath only supports directories')
-
-    def iterdir(self):
-        files = (file for path in self._paths for file in path.iterdir())
-        return unique_everseen(files, key=operator.attrgetter('name'))
-
-    def read_bytes(self):
-        raise FileNotFoundError(f'{self} is not a file')
-
-    def read_text(self, *args, **kwargs):
-        raise FileNotFoundError(f'{self} is not a file')
-
-    def is_dir(self):
-        return True
-
-    def is_file(self):
-        return False
-
-    def joinpath(self, child):
-        # first try to find child in current paths
-        for file in self.iterdir():
-            if file.name == child:
-                return file
-        # if it does not exist, construct it with the first path
-        return self._paths[0] / child
-
-    __truediv__ = joinpath
-
-    def open(self, *args, **kwargs):
-        raise FileNotFoundError(f'{self} is not a file')
-
-    @property
-    def name(self):
-        return self._paths[0].name
-
-    def __repr__(self):
-        paths = ', '.join(f"'{path}'" for path in self._paths)
-        return f'MultiplexedPath({paths})'
-
-
+	'\n    Given a series of Traversable objects, implement a merged\n    version of the interface across all objects. Useful for\n    namespace packages which may be multihomed at a single\n    name.\n    '
+	def __init__(A,*B):
+		A._paths=list(map(pathlib.Path,remove_duplicates(B)))
+		if not A._paths:C='MultiplexedPath must contain at least one path';raise FileNotFoundError(C)
+		if not all(A.is_dir()for A in A._paths):raise NotADirectoryError('MultiplexedPath only supports directories')
+	def iterdir(A):B=(B for A in A._paths for B in A.iterdir());return unique_everseen(B,key=operator.attrgetter('name'))
+	def read_bytes(A):raise FileNotFoundError(f"{A} is not a file")
+	def read_text(A,*B,**C):raise FileNotFoundError(f"{A} is not a file")
+	def is_dir(A):return True
+	def is_file(A):return False
+	def joinpath(A,child):
+		B=child
+		for C in A.iterdir():
+			if C.name==B:return C
+		return A._paths[0]/B
+	__truediv__=joinpath
+	def open(A,*B,**C):raise FileNotFoundError(f"{A} is not a file")
+	@property
+	def name(self):return self._paths[0].name
+	def __repr__(A):B=', '.join(f"'{A}'"for A in A._paths);return f"MultiplexedPath({B})"
 class NamespaceReader(abc.TraversableResources):
-    def __init__(self, namespace_path):
-        if 'NamespacePath' not in str(namespace_path):
-            raise ValueError('Invalid path')
-        self.path = MultiplexedPath(*list(namespace_path))
-
-    def resource_path(self, resource):
-        """
-        Return the file system path to prevent
-        `resources.path()` from creating a temporary
-        copy.
-        """
-        return str(self.path.joinpath(resource))
-
-    def files(self):
-        return self.path
+	def __init__(B,namespace_path):
+		A=namespace_path
+		if'NamespacePath'not in str(A):raise ValueError('Invalid path')
+		B.path=MultiplexedPath(*list(A))
+	def resource_path(A,resource):'\n        Return the file system path to prevent\n        `resources.path()` from creating a temporary\n        copy.\n        ';return str(A.path.joinpath(resource))
+	def files(A):return A.path

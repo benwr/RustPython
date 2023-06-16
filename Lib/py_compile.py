@@ -1,212 +1,52 @@
-"""Routine to "compile" a .py file to a .pyc file.
-
-This module has intimate knowledge of the format of .pyc files.
-"""
-
-import enum
-import importlib._bootstrap_external
-import importlib.machinery
-import importlib.util
-import os
-import os.path
-import sys
-import traceback
-
-__all__ = ["compile", "main", "PyCompileError", "PycInvalidationMode"]
-
-
+'Routine to "compile" a .py file to a .pyc file.\n\nThis module has intimate knowledge of the format of .pyc files.\n'
+_A=None
+import enum,importlib._bootstrap_external,importlib.machinery,importlib.util,os,os.path,sys,traceback
+__all__=['compile','main','PyCompileError','PycInvalidationMode']
 class PyCompileError(Exception):
-    """Exception raised when an error occurs while attempting to
-    compile the file.
-
-    To raise this exception, use
-
-        raise PyCompileError(exc_type,exc_value,file[,msg])
-
-    where
-
-        exc_type:   exception type to be used in error message
-                    type name can be accesses as class variable
-                    'exc_type_name'
-
-        exc_value:  exception value to be used in error message
-                    can be accesses as class variable 'exc_value'
-
-        file:       name of file being compiled to be used in error message
-                    can be accesses as class variable 'file'
-
-        msg:        string message to be written as error message
-                    If no value is given, a default exception message will be
-                    given, consistent with 'standard' py_compile output.
-                    message (or default) can be accesses as class variable
-                    'msg'
-
-    """
-
-    def __init__(self, exc_type, exc_value, file, msg=''):
-        exc_type_name = exc_type.__name__
-        if exc_type is SyntaxError:
-            tbtext = ''.join(traceback.format_exception_only(
-                exc_type, exc_value))
-            errmsg = tbtext.replace('File "<string>"', 'File "%s"' % file)
-        else:
-            errmsg = "Sorry: %s: %s" % (exc_type_name,exc_value)
-
-        Exception.__init__(self,msg or errmsg,exc_type_name,exc_value,file)
-
-        self.exc_type_name = exc_type_name
-        self.exc_value = exc_value
-        self.file = file
-        self.msg = msg or errmsg
-
-    def __str__(self):
-        return self.msg
-
-
-class PycInvalidationMode(enum.Enum):
-    TIMESTAMP = 1
-    CHECKED_HASH = 2
-    UNCHECKED_HASH = 3
-
-
+	"Exception raised when an error occurs while attempting to\n    compile the file.\n\n    To raise this exception, use\n\n        raise PyCompileError(exc_type,exc_value,file[,msg])\n\n    where\n\n        exc_type:   exception type to be used in error message\n                    type name can be accesses as class variable\n                    'exc_type_name'\n\n        exc_value:  exception value to be used in error message\n                    can be accesses as class variable 'exc_value'\n\n        file:       name of file being compiled to be used in error message\n                    can be accesses as class variable 'file'\n\n        msg:        string message to be written as error message\n                    If no value is given, a default exception message will be\n                    given, consistent with 'standard' py_compile output.\n                    message (or default) can be accesses as class variable\n                    'msg'\n\n    "
+	def __init__(A,exc_type,exc_value,file,msg=''):
+		C=file;D=exc_type;B=exc_value;E=D.__name__
+		if D is SyntaxError:G=''.join(traceback.format_exception_only(D,B));F=G.replace('File "<string>"','File "%s"'%C)
+		else:F='Sorry: %s: %s'%(E,B)
+		Exception.__init__(A,msg or F,E,B,C);A.exc_type_name=E;A.exc_value=B;A.file=C;A.msg=msg or F
+	def __str__(A):return A.msg
+class PycInvalidationMode(enum.Enum):TIMESTAMP=1;CHECKED_HASH=2;UNCHECKED_HASH=3
 def _get_default_invalidation_mode():
-    if os.environ.get('SOURCE_DATE_EPOCH'):
-        return PycInvalidationMode.CHECKED_HASH
-    else:
-        return PycInvalidationMode.TIMESTAMP
-
-
-def compile(file, cfile=None, dfile=None, doraise=False, optimize=-1,
-            invalidation_mode=None, quiet=0):
-    """Byte-compile one Python source file to Python bytecode.
-
-    :param file: The source file name.
-    :param cfile: The target byte compiled file name.  When not given, this
-        defaults to the PEP 3147/PEP 488 location.
-    :param dfile: Purported file name, i.e. the file name that shows up in
-        error messages.  Defaults to the source file name.
-    :param doraise: Flag indicating whether or not an exception should be
-        raised when a compile error is found.  If an exception occurs and this
-        flag is set to False, a string indicating the nature of the exception
-        will be printed, and the function will return to the caller. If an
-        exception occurs and this flag is set to True, a PyCompileError
-        exception will be raised.
-    :param optimize: The optimization level for the compiler.  Valid values
-        are -1, 0, 1 and 2.  A value of -1 means to use the optimization
-        level of the current interpreter, as given by -O command line options.
-    :param invalidation_mode:
-    :param quiet: Return full output with False or 0, errors only with 1,
-        and no output with 2.
-
-    :return: Path to the resulting byte compiled file.
-
-    Note that it isn't necessary to byte-compile Python modules for
-    execution efficiency -- Python itself byte-compiles a module when
-    it is loaded, and if it can, writes out the bytecode to the
-    corresponding .pyc file.
-
-    However, if a Python installation is shared between users, it is a
-    good idea to byte-compile all modules upon installation, since
-    other users may not be able to write in the source directories,
-    and thus they won't be able to write the .pyc file, and then
-    they would be byte-compiling every module each time it is loaded.
-    This can slow down program start-up considerably.
-
-    See compileall.py for a script/module that uses this module to
-    byte-compile all installed files (or all files in selected
-    directories).
-
-    Do note that FileExistsError is raised if cfile ends up pointing at a
-    non-regular file or symlink. Because the compilation uses a file renaming,
-    the resulting file would be regular and thus not the same type of file as
-    it was previously.
-    """
-    if invalidation_mode is None:
-        invalidation_mode = _get_default_invalidation_mode()
-    if cfile is None:
-        if optimize >= 0:
-            optimization = optimize if optimize >= 1 else ''
-            cfile = importlib.util.cache_from_source(file,
-                                                     optimization=optimization)
-        else:
-            cfile = importlib.util.cache_from_source(file)
-    if os.path.islink(cfile):
-        msg = ('{} is a symlink and will be changed into a regular file if '
-               'import writes a byte-compiled file to it')
-        raise FileExistsError(msg.format(cfile))
-    elif os.path.exists(cfile) and not os.path.isfile(cfile):
-        msg = ('{} is a non-regular file and will be changed into a regular '
-               'one if import writes a byte-compiled file to it')
-        raise FileExistsError(msg.format(cfile))
-    loader = importlib.machinery.SourceFileLoader('<py_compile>', file)
-    source_bytes = loader.get_data(file)
-    try:
-        code = loader.source_to_code(source_bytes, dfile or file,
-                                     _optimize=optimize)
-    except Exception as err:
-        py_exc = PyCompileError(err.__class__, err, dfile or file)
-        if quiet < 2:
-            if doraise:
-                raise py_exc
-            else:
-                sys.stderr.write(py_exc.msg + '\n')
-        return
-    try:
-        dirname = os.path.dirname(cfile)
-        if dirname:
-            os.makedirs(dirname)
-    except FileExistsError:
-        pass
-    if invalidation_mode == PycInvalidationMode.TIMESTAMP:
-        source_stats = loader.path_stats(file)
-        bytecode = importlib._bootstrap_external._code_to_timestamp_pyc(
-            code, source_stats['mtime'], source_stats['size'])
-    else:
-        source_hash = importlib.util.source_hash(source_bytes)
-        bytecode = importlib._bootstrap_external._code_to_hash_pyc(
-            code,
-            source_hash,
-            (invalidation_mode == PycInvalidationMode.CHECKED_HASH),
-        )
-    mode = importlib._bootstrap_external._calc_mode(file)
-    importlib._bootstrap_external._write_atomic(cfile, bytecode, mode)
-    return cfile
-
-
+	if os.environ.get('SOURCE_DATE_EPOCH'):return PycInvalidationMode.CHECKED_HASH
+	else:return PycInvalidationMode.TIMESTAMP
+def compile(file,cfile=_A,dfile=_A,doraise=False,optimize=-1,invalidation_mode=_A,quiet=0):
+	"Byte-compile one Python source file to Python bytecode.\n\n    :param file: The source file name.\n    :param cfile: The target byte compiled file name.  When not given, this\n        defaults to the PEP 3147/PEP 488 location.\n    :param dfile: Purported file name, i.e. the file name that shows up in\n        error messages.  Defaults to the source file name.\n    :param doraise: Flag indicating whether or not an exception should be\n        raised when a compile error is found.  If an exception occurs and this\n        flag is set to False, a string indicating the nature of the exception\n        will be printed, and the function will return to the caller. If an\n        exception occurs and this flag is set to True, a PyCompileError\n        exception will be raised.\n    :param optimize: The optimization level for the compiler.  Valid values\n        are -1, 0, 1 and 2.  A value of -1 means to use the optimization\n        level of the current interpreter, as given by -O command line options.\n    :param invalidation_mode:\n    :param quiet: Return full output with False or 0, errors only with 1,\n        and no output with 2.\n\n    :return: Path to the resulting byte compiled file.\n\n    Note that it isn't necessary to byte-compile Python modules for\n    execution efficiency -- Python itself byte-compiles a module when\n    it is loaded, and if it can, writes out the bytecode to the\n    corresponding .pyc file.\n\n    However, if a Python installation is shared between users, it is a\n    good idea to byte-compile all modules upon installation, since\n    other users may not be able to write in the source directories,\n    and thus they won't be able to write the .pyc file, and then\n    they would be byte-compiling every module each time it is loaded.\n    This can slow down program start-up considerably.\n\n    See compileall.py for a script/module that uses this module to\n    byte-compile all installed files (or all files in selected\n    directories).\n\n    Do note that FileExistsError is raised if cfile ends up pointing at a\n    non-regular file or symlink. Because the compilation uses a file renaming,\n    the resulting file would be regular and thus not the same type of file as\n    it was previously.\n    ";G=dfile;C=invalidation_mode;D=optimize;B=file;A=cfile
+	if C is _A:C=_get_default_invalidation_mode()
+	if A is _A:
+		if D>=0:O=D if D>=1 else'';A=importlib.util.cache_from_source(B,optimization=O)
+		else:A=importlib.util.cache_from_source(B)
+	if os.path.islink(A):E='{} is a symlink and will be changed into a regular file if import writes a byte-compiled file to it';raise FileExistsError(E.format(A))
+	elif os.path.exists(A)and not os.path.isfile(A):E='{} is a non-regular file and will be changed into a regular one if import writes a byte-compiled file to it';raise FileExistsError(E.format(A))
+	F=importlib.machinery.SourceFileLoader('<py_compile>',B);H=F.get_data(B)
+	try:I=F.source_to_code(H,G or B,_optimize=D)
+	except Exception as J:
+		K=PyCompileError(J.__class__,J,G or B)
+		if quiet<2:
+			if doraise:raise K
+			else:sys.stderr.write(K.msg+'\n')
+		return
+	try:
+		L=os.path.dirname(A)
+		if L:os.makedirs(L)
+	except FileExistsError:pass
+	if C==PycInvalidationMode.TIMESTAMP:M=F.path_stats(B);N=importlib._bootstrap_external._code_to_timestamp_pyc(I,M['mtime'],M['size'])
+	else:P=importlib.util.source_hash(H);N=importlib._bootstrap_external._code_to_hash_pyc(I,P,C==PycInvalidationMode.CHECKED_HASH)
+	Q=importlib._bootstrap_external._calc_mode(B);importlib._bootstrap_external._write_atomic(A,N,Q);return A
 def main():
-    import argparse
-
-    description = 'A simple command-line interface for py_compile module.'
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        '-q', '--quiet',
-        action='store_true',
-        help='Suppress error output',
-    )
-    parser.add_argument(
-        'filenames',
-        nargs='+',
-        help='Files to compile',
-    )
-    args = parser.parse_args()
-    if args.filenames == ['-']:
-        filenames = [filename.rstrip('\n') for filename in sys.stdin.readlines()]
-    else:
-        filenames = args.filenames
-    for filename in filenames:
-        try:
-            compile(filename, doraise=True)
-        except PyCompileError as error:
-            if args.quiet:
-                parser.exit(1)
-            else:
-                parser.exit(1, error.msg)
-        except OSError as error:
-            if args.quiet:
-                parser.exit(1)
-            else:
-                parser.exit(1, str(error))
-
-
-if __name__ == "__main__":
-    main()
+	import argparse as E;F='A simple command-line interface for py_compile module.';A=E.ArgumentParser(description=F);A.add_argument('-q','--quiet',action='store_true',help='Suppress error output');A.add_argument('filenames',nargs='+',help='Files to compile');B=A.parse_args()
+	if B.filenames==['-']:D=[A.rstrip('\n')for A in sys.stdin.readlines()]
+	else:D=B.filenames
+	for G in D:
+		try:compile(G,doraise=True)
+		except PyCompileError as C:
+			if B.quiet:A.exit(1)
+			else:A.exit(1,C.msg)
+		except OSError as C:
+			if B.quiet:A.exit(1)
+			else:A.exit(1,str(C))
+if __name__=='__main__':main()
